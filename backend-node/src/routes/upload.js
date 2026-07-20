@@ -92,6 +92,25 @@ function routes(cfg, log, db) {
         response.internalError(res, err.message || '上传失败');
       }
     },
+    uploadAudio: (req, res) => {
+      if (!req.file || !req.file.buffer) return response.badRequest(res, '请选择音频文件');
+      try {
+        const rawStorage = cfg?.storage?.local_path || './data/storage';
+        const storagePath = path.isAbsolute(rawStorage) ? rawStorage : path.join(process.cwd(), rawStorage);
+        const baseUrl = cfg?.storage?.base_url || '';
+        const result = uploadService.uploadFile(
+          storagePath, baseUrl, log, req.file.buffer,
+          req.file.originalname || 'audio.mp3', req.file.mimetype, 'audio', 'library'
+        );
+        response.success(res, {
+          url: result.url, path: result.local_path, local_path: result.local_path,
+          filename: req.file.originalname, size: req.file.size, mime_type: req.file.mimetype,
+        });
+      } catch (err) {
+        log.error('upload audio', { error: err.message });
+        response.internalError(res, err.message || '上传失败');
+      }
+    },
   };
 }
 

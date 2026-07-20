@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { normalizeMaterialHubToken } = require('./jimengMaterialHubService');
+const { appendSearchParams, resolveEndpointUrl } = require('./endpointUrl');
 
 function normalizeApiKeyForService(serviceType, apiKey) {
   if (serviceType === 'jimeng2_character_auth' && apiKey != null) {
@@ -93,7 +94,7 @@ function createConfig(db, log, req) {
     } else if (p === 'volces' || p === 'volcengine' || p === 'volc') {
       if (st === 'video') {
         endpoint = '/contents/generations/tasks';
-        queryEndpoint = '/contents/generations/tasks/{taskId}';
+        queryEndpoint = '/contents/generations/tasks/{id}';
       } else if (st === 'image' || st === 'storyboard_image') {
         endpoint = '/images/generations';
       }
@@ -341,6 +342,31 @@ async function testConnection(opts) {
   const treatAsImage = isImageService || hasImageEndpoint || isDashscopeNonChatEndpoint
     || looksLikeImageModel
     || (isVolcengine && !serviceType && !endpoint);
+
+  // 火山视频配置用任务列表做只读探针。必须按用户保存的 Base URL 与任务列表端点
+  // 原样解析，不再改写 Plan/标准地址，也不再借用 chat/completions 判断视频 Key。
+  if (isVideoService && isVolcengine) {
+    let settings = {};
+    try {
+      settings = typeof opts.settings === 'string' ? JSON.parse(opts.settings || '{}') : (opts.settings || {});
+    } catch (_) {}
+    const listEndpoint = resolveEndpointUrl(base, settings.task_list_endpoint, '/contents/generations/tasks');
+    const url = appendSearchParams(listEndpoint, { page_num: 1, page_size: 1 });
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { Authorization: 'Bearer ' + opts.api_key, 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      let detail = text.slice(0, 300);
+      try {
+        const data = JSON.parse(text);
+        detail = data?.error?.message || data?.message || data?.error || detail;
+      } catch (_) {}
+      throw new Error(`火山视频任务列表请求失败（HTTP ${res.status}）：${detail || '上游未返回错误详情'}；请求地址 ${url}`);
+    }
+    return;
+  }
 
   // --- DashScope 图片 / 视频 / 分镜 ---
   // 通义万象 / WAN 系列：API key 通过 compatible-mode chat 接口验证即可（同一 key 通用）

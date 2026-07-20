@@ -34,10 +34,22 @@ const router = createRouter({
       meta: { title: 'AI 配置' }
     },
     {
+      path: '/studio/:id',
+      name: 'free-studio',
+      component: () => import('@/views/FreeStudio.vue'),
+      meta: { title: '自由创作' }
+    },
+    {
       path: '/free-create',
       name: 'free-create',
       component: () => import('@/views/FreeCreate.vue'),
       meta: { title: '自由创作' }
+    },
+    {
+      path: '/materials',
+      name: 'materials',
+      component: () => import('@/views/MaterialLibrary.vue'),
+      meta: { title: '素材库' }
     },
     {
       path: '/media-library',
@@ -50,7 +62,7 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   if (to.meta.title) {
-    document.title = `${to.meta.title} - LocalMiniDrama`
+    document.title = `${to.meta.title} - CineGenPlatform`
   }
   return true
 })

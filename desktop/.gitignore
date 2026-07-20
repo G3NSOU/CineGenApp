@@ -3,3 +3,5 @@ release/
 frontweb-dist/
 backend-app/
 *.log
+vendor/darwin-arm64/ffmpeg
+vendor/darwin-arm64/ffprobe

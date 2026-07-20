@@ -4,6 +4,7 @@ const path = require('path');
 const https = require('https');
 const http = require('http');
 const { randomUUID } = require('crypto');
+const tosStorageService = require('./tosStorageService');
 
 /**
  * 用 Node.js 原生 http/https 模块下载 URL 到 Buffer。
@@ -20,7 +21,7 @@ function downloadBufferViaNodeHttp(url, timeoutMs = 30000, redirectCount = 0) {
       path: parsed.pathname + parsed.search,
       method: 'GET',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; LocalMiniDrama/1.0)',
+        'User-Agent': 'Mozilla/5.0 (compatible; CineGen/1.4.25)',
         'Accept': 'image/*,*/*',
       },
       timeout: timeoutMs,
@@ -162,7 +163,7 @@ function getImageProxyUploadSettings() {
  * 响应：{ url: "https://imageproxy.zhongzhuan.chat/api/proxy/image/<hash>", created: ... }
  * 失败自动重试；成功返回 string URL，全部失败返回 null。
  */
-async function uploadToImageProxy(imageBuffer, mimeType, log, tag) {
+async function uploadToThirdPartyImageProxy(imageBuffer, mimeType, log, tag) {
   const { uploadUrl, timeoutMs, maxAttempts } = getImageProxyUploadSettings();
   const extMap = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
   const ext = extMap[mimeType] || 'jpg';
@@ -214,6 +215,95 @@ async function uploadToImageProxy(imageBuffer, mimeType, log, tag) {
 }
 
 /**
+ * TOS 已配置时优先上传；未配置或上传失败时自动回退现有第三方图床。
+ * deps 只用于隔离外部网络的回归测试，生产环境使用官方 TOS SDK 和原有图床实现。
+ */
+async function uploadToPreferredStorage(imageBuffer, mimeType, log, tag, deps = {}) {
+  const tosUpload = deps.tosUpload || tosStorageService.uploadBufferToTos;
+  const fallbackUpload = deps.fallbackUpload || uploadToThirdPartyImageProxy;
+  try {
+    const tosResult = await tosUpload(imageBuffer, mimeType, tag);
+    if (tosResult?.url) {
+      log.info('[TOS 上传] ✓ 成功', {
+        tag,
+        bucket: tosResult.bucket,
+        key: tosResult.key,
+        access: tosResult.url.includes('X-Tos-') ? 'presigned' : 'public',
+      });
+      return tosResult.url;
+    }
+    if (!tosResult?.skipped) log.warn('[TOS 上传] 未返回 URL，回退第三方图床', { tag });
+  } catch (error) {
+    log.warn('[TOS 上传] 失败，回退第三方图床', {
+      tag,
+      code: error.code || error.name || 'TOS_ERROR',
+      error: error.message,
+      request_id: error.requestId || null,
+    });
+  }
+  return fallbackUpload(imageBuffer, mimeType, log, tag);
+}
+
+async function uploadToImageProxy(imageBuffer, mimeType, log, tag) {
+  return uploadToPreferredStorage(imageBuffer, mimeType, log, tag);
+}
+
+/**
+ * 将前端可能提交的本地引用安全地还原为 storage 根目录内的文件。
+ * 支持 local_path、/static/...、static/...、localhost /static URL，拒绝目录穿越
+ * 和 storage 之外的绝对路径，避免把任意系统文件上传到第三方图床。
+ */
+function resolveStorageFilePath(storagePath, localPathOrUrl) {
+  if (!storagePath || !localPathOrUrl || typeof localPathOrUrl !== 'string') return null;
+  const root = path.resolve(storagePath);
+  let raw = localPathOrUrl.trim();
+  if (!raw || raw.startsWith('data:') || raw.startsWith('asset://')) return null;
+
+  let cameFromStaticUrl = false;
+  if (/^https?:\/\//i.test(raw)) {
+    let parsed;
+    try { parsed = new URL(raw); } catch (_) { return null; }
+    const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    const isLocalHost = host === 'localhost'
+      || host === '::1'
+      || host === '0.0.0.0'
+      || /^127\./.test(host)
+      || /^10\./.test(host)
+      || /^192\.168\./.test(host)
+      || /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+      || host.endsWith('.local');
+    if (!isLocalHost) return null;
+    const markerIndex = parsed.pathname.toLowerCase().indexOf('/static/');
+    if (markerIndex < 0) return null;
+    raw = parsed.pathname.slice(markerIndex + '/static/'.length);
+    cameFromStaticUrl = true;
+  } else {
+    raw = raw.split(/[?#]/, 1)[0];
+  }
+
+  try { raw = decodeURIComponent(raw); } catch (_) { return null; }
+  raw = raw.replace(/\\/g, '/');
+  const isStaticPath = /^\/?static\//i.test(raw);
+  if (isStaticPath) raw = raw.replace(/^\/?static\//i, '');
+
+  let candidate;
+  if (!cameFromStaticUrl && !isStaticPath && path.isAbsolute(raw)) {
+    candidate = path.resolve(raw);
+  } else {
+    const relative = raw.replace(/^\/+/, '');
+    if (!relative) return null;
+    candidate = path.resolve(root, relative);
+  }
+
+  const insideRoot = candidate === root || candidate.startsWith(root + path.sep);
+  if (!insideRoot) return null;
+  return {
+    filePath: candidate,
+    relativePath: path.relative(root, candidate).replace(/\\/g, '/'),
+  };
+}
+
+/**
  * 将本地文件路径或 localhost URL 的图片上传到图床，返回公网 URL。
  * - localPath: 相对 storagePath 的路径，如 "images/ig_xxx.jpg"
  * - localhostUrl: 类似 "http://localhost:5679/static/images/ig_xxx.jpg" 的 URL
@@ -221,21 +311,11 @@ async function uploadToImageProxy(imageBuffer, mimeType, log, tag) {
  */
 async function uploadLocalImageToProxy(storagePath, localPathOrUrl, log, tag) {
   try {
-    let filePath = null;
+    const resolved = resolveStorageFilePath(storagePath, localPathOrUrl);
+    const filePath = resolved?.filePath || null;
     let mimeType = 'image/jpeg';
-    if (localPathOrUrl && localPathOrUrl.startsWith('http')) {
-      // localhost URL → 提取 /static/ 后的相对路径
-      const afterStatic = localPathOrUrl.split('/static/')[1];
-      if (afterStatic && storagePath) {
-        filePath = path.join(storagePath, afterStatic.replace(/^\//, ''));
-      }
-    } else if (localPathOrUrl && storagePath) {
-      filePath = path.isAbsolute(localPathOrUrl)
-        ? localPathOrUrl
-        : path.join(storagePath, localPathOrUrl.replace(/^\//, ''));
-    }
     if (!filePath || !fs.existsSync(filePath)) {
-      log.warn('[图床上传] 本地文件不存在', { tag, filePath });
+      log.warn('[图床上传] 本地文件不存在或路径不安全', { tag, filePath, input: String(localPathOrUrl || '').slice(0, 120) });
       return null;
     }
     const ext = path.extname(filePath).toLowerCase();
@@ -253,5 +333,8 @@ module.exports = {
   uploadFile,
   downloadImageToLocal,
   uploadToImageProxy,
+  uploadToPreferredStorage,
+  uploadToThirdPartyImageProxy,
   uploadLocalImageToProxy,
+  resolveStorageFilePath,
 };

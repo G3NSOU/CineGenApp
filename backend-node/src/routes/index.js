@@ -21,6 +21,9 @@ const assetRoutes = require('./assets');
 const audioRoutes = require('./audio');
 const promptOverridesRoutes = require('./promptOverrides');
 const sceneModelMapRoutes = require('./sceneModelMap');
+const mediaLibraryRoutes = require('./mediaLibrary');
+const materialTosRoutes = require('./materialTos');
+const materialVersionRoutes = require('./materialVersions');
 
 function setupRouter(cfg, db, log) {
   const r = express.Router();
@@ -47,6 +50,9 @@ function setupRouter(cfg, db, log) {
   const assets = assetRoutes(db, log);
   const audio = audioRoutes(db, log, cfg);
   const promptOverrides = promptOverridesRoutes.routes(db, log);
+  const mediaLibrary = mediaLibraryRoutes(db, log);
+  const materialTos = materialTosRoutes(db, cfg, log);
+  const materialVersions = materialVersionRoutes(db, log);
 
   // ---------- dramas ----------
   r.get('/dramas', drama.listDramas);
@@ -159,6 +165,22 @@ function setupRouter(cfg, db, log) {
   r.put('/prop-library/:id', propLibrary.update);
   r.delete('/prop-library/:id', propLibrary.delete);
 
+  // ---------- audio / voice library ----------
+  r.get('/audio-library', mediaLibrary.audio.list);
+  r.post('/audio-library', mediaLibrary.audio.create);
+  r.get('/audio-library/:id', mediaLibrary.audio.get);
+  r.put('/audio-library/:id', mediaLibrary.audio.update);
+  r.delete('/audio-library/:id', mediaLibrary.audio.delete);
+  r.get('/voice-library', mediaLibrary.voice.list);
+  r.post('/voice-library', mediaLibrary.voice.create);
+  r.get('/voice-library/:id', mediaLibrary.voice.get);
+  r.put('/voice-library/:id', mediaLibrary.voice.update);
+  r.delete('/voice-library/:id', mediaLibrary.voice.delete);
+  r.put('/voice-bindings/:id', mediaLibrary.bindVoice);
+  r.post('/materials/:source/:type/:id/sync-tos', materialTos.sync);
+  r.get('/materials/global/:type/:id/versions', materialVersions.list);
+  r.put('/materials/global/:type/:id/versions/:versionId/activate', materialVersions.activate);
+
   // ---------- characters ----------
   r.get('/characters/:id', characters.getOne);
   r.put('/characters/:id', characters.update);
@@ -208,6 +230,7 @@ function setupRouter(cfg, db, log) {
 
   // ---------- upload ----------
   r.post('/upload/image', uploadModule.multerSingle, uploadHandlers.uploadImage);
+  r.post('/upload/audio', uploadModule.multerAudioSingle, uploadHandlers.uploadAudio);
 
   // ---------- episodes ----------
   // 注意：drama.generateStoryboard 已处理所有逻辑（包括参数解析），这里统一使用 drama 模块的实现
@@ -251,6 +274,10 @@ function setupRouter(cfg, db, log) {
   // ---------- videos ----------
   r.get('/videos', videos.list);
   r.post('/videos', videos.create);
+  r.get('/videos/provider-tasks', videos.providerTasks);
+  r.delete('/videos/provider-tasks/:task_id', videos.deleteProviderTask);
+  r.post('/videos/:id/cancel', videos.cancel);
+  r.post('/videos/:id/duplicate', videos.duplicate);
   r.post('/videos/image/:image_gen_id', videos.fromImage);
   r.post('/videos/episode/:episode_id/batch', videos.episodeBatch);
   r.get('/videos/:id', videos.get);
@@ -303,6 +330,9 @@ function setupRouter(cfg, db, log) {
   r.put('/settings/language', settings.updateLanguage);
   r.get('/settings/generation', settings.getGenerationSettings);
   r.put('/settings/generation', settings.updateGenerationSettings);
+  r.get('/settings/storage/tos', settings.getTosStorageSettings);
+  r.put('/settings/storage/tos', settings.updateTosStorageSettings);
+  r.post('/settings/storage/tos/test', settings.testTosStorageSettings);
 
   // ---------- prompt overrides ----------
   r.get('/settings/prompts', promptOverrides.list);

@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend-node/package-lock.json
+            frontweb/package-lock.json
+      - name: Audit source tree
+        run: node release-tools/audit-source-tree.js
+      - name: Install backend dependencies
+        working-directory: backend-node
+        run: npm ci
+      - name: Test backend
+        working-directory: backend-node
+        run: node --test test/*.test.js
+      - name: Install frontend dependencies
+        working-directory: frontweb
+        run: npm ci
+      - name: Test frontend
+        working-directory: frontweb
+        run: node --test test/*.test.js
+      - name: Build frontend
+        working-directory: frontweb
+        run: npm run build

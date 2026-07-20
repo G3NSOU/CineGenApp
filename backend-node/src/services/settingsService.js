@@ -67,10 +67,34 @@ function setGlobalSetting(db, key, value) {
   ).run(key, str, now);
 }
 
+function updateTosStorageConfig(cfg, log, value) {
+  cfg.tos_storage = { ...(value || {}) };
+  setConfigPath(cfg);
+  if (!configPath) return { ok: false, error: '找不到 configs/config.yaml' };
+  try {
+    const current = yaml.load(fs.readFileSync(configPath, 'utf8')) || {};
+    current.tos_storage = { ...cfg.tos_storage };
+    fs.writeFileSync(configPath, yaml.dump(current, { lineWidth: -1, noRefs: true }), 'utf8');
+    log.info('[TOS] 存储配置已更新', {
+      enabled: cfg.tos_storage.enabled,
+      endpoint: cfg.tos_storage.endpoint,
+      region: cfg.tos_storage.region,
+      bucket: cfg.tos_storage.bucket,
+      has_access_key: Boolean(cfg.tos_storage.access_key_id),
+      has_secret_key: Boolean(cfg.tos_storage.secret_access_key),
+    });
+    return { ok: true };
+  } catch (error) {
+    log.error('[TOS] 写入配置失败', { error: error.message });
+    return { ok: false, error: error.message };
+  }
+}
+
 module.exports = {
   setConfigPath,
   getLanguage,
   updateLanguage,
   getGlobalSetting,
   setGlobalSetting,
+  updateTosStorageConfig,
 };

@@ -17,7 +17,7 @@
       <div class="preview-col">
         <div class="preview-box">
           <img v-if="previewUrl && !generating" :src="previewUrl" alt="" />
-          <div v-else-if="!generating" class="preview-empty">{{ kindIcon }}</div>
+          <div v-else-if="!generating" class="preview-empty"><el-icon><component :is="kindIcon" /></el-icon></div>
           <div v-if="generating || nodeBusy" class="preview-loading">
             <span class="spinner" />
             <span>{{ nodeBusy?.message || '生成参考图…' }}</span>
@@ -140,6 +140,7 @@ import { propAPI } from '@/api/props'
 import { useCanvasContext } from '@/composables/useCanvasContext'
 import { generateAssetReferenceImage } from '@/composables/useCanvasAssetGenerate'
 import { assetImageUrl } from '@/utils/mediaUrl'
+import { User, PictureFilled, Box } from '@element-plus/icons-vue'
 
 const props = defineProps({
   kind: { type: String, required: true },
@@ -166,8 +167,8 @@ const kindLabel = computed(() => {
 })
 
 const kindIcon = computed(() => {
-  const map = { character: '👤', scene: '🏞', prop: '🎭' }
-  return map[props.kind] || '📦'
+  const map = { character: User, scene: PictureFilled, prop: Box }
+  return map[props.kind] || Box
 })
 
 const previewUrl = computed(() => assetImageUrl(props.entity))

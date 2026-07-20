@@ -1,8 +1,8 @@
 <template>
   <div class="ai-config-content">
-    <el-tabs v-model="activeTab" class="config-tabs">
-      <el-tab-pane label="AI 配置" name="configs">
-        <div class="tab-content">
+    <el-tabs v-model="activeTab" class="config-tabs" :class="{ 'config-tabs--page': pageMode }">
+      <el-tab-pane label="AI 配置" name="configs" lazy>
+        <div v-if="activeTab === 'configs'" class="tab-content">
           <!-- 普通模式操作栏 -->
           <div v-if="!vendorLock.enabled" class="content-actions">
             <div class="actions-left">
@@ -22,6 +22,10 @@
               <el-button type="success" plain @click="openOneKeyVolc">
                 <el-icon><MagicStick /></el-icon>
                 一键配置火山
+              </el-button>
+              <el-button plain @click="openVolcTasks">
+                <el-icon><List /></el-icon>
+                火山视频任务
               </el-button>
               <el-button type="success" plain @click="openOneKeyAgnes">
                 <el-icon><MagicStick /></el-icon>
@@ -55,7 +59,7 @@
               class="vendor-lock-tip"
             >
               <template #title>
-                <span>🔒 当前为厂商锁定模式，AI 服务由管理员统一配置。你只能修改 <b>API Key</b> 和 <b>默认模型</b>。</span>
+                <span class="icon-label"><el-icon><Lock /></el-icon>当前为厂商锁定模式，AI 服务由管理员统一配置。你只能修改 <b>API Key</b> 和 <b>默认模型</b>。</span>
               </template>
             </el-alert>
             <el-button type="primary" size="small" class="vendor-bulk-key-btn" @click="openBulkKey">
@@ -98,7 +102,7 @@
             </el-table-column>
             <el-table-column prop="is_default" label="默认" width="60">
               <template #default="{ row }">
-                <el-tag v-if="row.is_default" type="success" size="small">✓</el-tag>
+                <el-tag v-if="row.is_default" type="success" size="small"><el-icon><Check /></el-icon></el-tag>
                 <span v-else class="no-default">—</span>
               </template>
             </el-table-column>
@@ -112,19 +116,19 @@
           </el-table>
         </div>
       </el-tab-pane>
-      <el-tab-pane label="高级设置（提示词）" name="prompts">
-        <div class="tab-content">
+      <el-tab-pane label="高级设置（提示词）" name="prompts" lazy>
+        <div v-if="activeTab === 'prompts'" class="tab-content">
           <PromptEditor />
         </div>
       </el-tab-pane>
-      <el-tab-pane label="高级设置（业务场景）" name="sceneModelMap">
-        <div class="tab-content">
+      <el-tab-pane label="高级设置（业务场景）" name="sceneModelMap" lazy>
+        <div v-if="activeTab === 'sceneModelMap'" class="tab-content">
           <SceneModelMap />
         </div>
       </el-tab-pane>
-      <el-tab-pane label="生成设置" name="generation">
-        <div class="tab-content generation-settings">
-          <div class="gs-section-title">⚡ 一键生成并发设置</div>
+      <el-tab-pane label="生成设置" name="generation" lazy>
+        <div v-if="activeTab === 'generation'" class="tab-content generation-settings">
+          <div class="gs-section-title icon-label"><el-icon><Lightning /></el-icon>一键生成并发设置</div>
           <p class="gs-desc">控制「一键生成视频」和「补全并生成」流水线中，各类任务同时并行生成的数量。并发数越高速度越快，但过高可能触发 API 限流（429 错误）。建议根据你的 API 额度选择。</p>
 
           <div class="gs-row">
@@ -186,7 +190,7 @@
             style="margin-top: 12px; width: fit-content"
           />
           <div class="gs-tip-box">
-            <div class="gs-tip-title">📌 适用范围</div>
+            <div class="gs-tip-title icon-label"><el-icon><InfoFilled /></el-icon>适用范围</div>
             <ul class="gs-tip-list">
               <li>图片并发：步骤 2 角色图、步骤 4 场景图、步骤 6 分镜图</li>
               <li>视频并发：步骤 7 分镜视频</li>
@@ -194,18 +198,60 @@
           </div>
         </div>
       </el-tab-pane>
-      <el-tab-pane label="SD2 资产管理" name="sd2_assets">
-        <div class="tab-content">
+      <el-tab-pane label="SD2 资产管理" name="sd2_assets" lazy>
+        <div v-if="activeTab === 'sd2_assets'" class="tab-content">
           <Sd2AssetManagement :configs="list" @saved="loadList" />
+        </div>
+      </el-tab-pane>
+      <el-tab-pane label="存储设置" name="storage" lazy>
+        <div v-if="activeTab === 'storage'" class="tab-content">
+          <TosStorageSettings />
         </div>
       </el-tab-pane>
     </el-tabs>
 
     <!-- 添加/编辑 -->
     <el-dialog
+      v-model="volcTasksVisible"
+      append-to-body
+      title="火山方舟视频任务"
+      width="980px"
+      class="ai-config-provider-tasks-dialog"
+    >
+      <div class="provider-task-toolbar">
+        <el-select v-model="volcTaskStatus" clearable placeholder="全部状态" style="width: 160px" @change="loadVolcTasks">
+          <el-option label="排队中" value="queued" />
+          <el-option label="运行中" value="running" />
+          <el-option label="已成功" value="succeeded" />
+          <el-option label="已失败" value="failed" />
+          <el-option label="已取消" value="cancelled" />
+        </el-select>
+        <el-button :loading="volcTasksLoading" @click="loadVolcTasks">刷新</el-button>
+        <span>调用方舟官方任务列表；排队任务执行取消，其余状态执行删除。</span>
+      </div>
+      <el-table v-loading="volcTasksLoading" :data="volcTasks" max-height="520" empty-text="暂无任务，或当前默认视频配置不是火山官方接口">
+        <el-table-column prop="id" label="任务 ID" min-width="220" show-overflow-tooltip />
+        <el-table-column prop="model" label="模型" min-width="190" show-overflow-tooltip />
+        <el-table-column prop="status" label="状态" width="105" />
+        <el-table-column prop="created_at" label="创建时间" width="150" />
+        <el-table-column label="操作" width="110" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="danger" :loading="volcTaskDeleting === row.id" @click="removeVolcTask(row)">
+              {{ row.status === 'queued' ? '取消' : '删除' }}
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer><el-button @click="volcTasksVisible = false">关闭</el-button></template>
+    </el-dialog>
+
+    <!-- 添加/编辑 -->
+    <el-dialog
       v-model="dialogVisible"
+      append-to-body
       :title="vendorLock.enabled ? '修改 API Key / 默认模型' : (editingId ? '编辑配置' : '添加配置')"
-      width="520px"
+      width="680px"
+      class="ai-config-editor-dialog"
       :close-on-click-modal="false"
       @closed="resetForm"
     >
@@ -319,7 +365,7 @@
         <el-form-item v-if="form.service_type !== 'text' && form.service_type !== 'tts' && form.service_type !== 'jimeng2_character_auth'">
           <template #label>
             <span class="form-label-tip">接口规范
-              <el-icon class="tip-icon" style="cursor:pointer;color:#409eff" @click="showProtocolHelp = true"><QuestionFilled /></el-icon>
+              <el-icon class="tip-icon" @click="showProtocolHelp = true"><QuestionFilled /></el-icon>
             </span>
           </template>
           <el-select v-model="form.api_protocol" style="width: 100%" placeholder="选择接口规范（自定义厂商必选）" clearable>
@@ -338,9 +384,9 @@
         </el-form-item>
 
         <!-- 接口规范帮助 Dialog -->
-        <el-dialog v-model="showProtocolHelp" title="接口规范说明" width="700px" top="5vh">
+        <el-dialog v-model="showProtocolHelp" append-to-body title="接口规范说明" width="820px" top="5vh" class="ai-config-help-dialog">
           <div class="protocol-help">
-            <div class="ph-section-title">🖼 图片 / 分镜图 协议</div>
+            <div class="ph-section-title"><el-icon><Picture /></el-icon>图片 / 分镜图 协议</div>
             <el-collapse accordion>
               <el-collapse-item name="openai-img">
                 <template #title><span class="ph-tag ph-tag-img">图片</span> OpenAI 兼容 — 绝大多数中转站默认</template>
@@ -374,7 +420,7 @@
               </el-collapse-item>
             </el-collapse>
 
-            <div class="ph-section-title" style="margin-top:16px">🎬 视频 协议</div>
+            <div class="ph-section-title" style="margin-top:16px"><el-icon><VideoCamera /></el-icon>视频协议</div>
             <el-collapse accordion>
               <el-collapse-item name="openai-vid">
                 <template #title><span class="ph-tag ph-tag-vid">视频</span> OpenAI 兼容 — content 数组格式</template>
@@ -433,7 +479,7 @@ input_reference = (图片文件，可选)</pre>
                 <template #title><span class="ph-tag ph-tag-vid">视频</span> 火山即梦 Seedance 全能（多图参考）</template>
                 <div class="ph-body">
                   <b>适用：</b>方舟 Seedance 2.0 等支持多参考图的全能链路；与「全能模式」分镜、<code>@图片1</code>… 提示词配合使用。<br>
-                  <b>Endpoint：</b><code>POST {base}/contents/generations/tasks</code>，轮询 <code>GET {base}/contents/generations/tasks/{taskId}</code><br>
+                  <b>Endpoint：</b><code>POST {base}/contents/generations/tasks</code>，轮询 <code>GET {base}/contents/generations/tasks/{id}</code><br>
                   <b>厂商：</b>仍选「火山引擎」，<b>接口规范</b>选本项；模型填控制台接入点（如 <code>doubao-seedance-2-0-260128</code>，以控制台为准）。<br>
                   <pre>{ "model": "doubao-seedance-2-0-260128",
   "task_type": "i2v",
@@ -689,8 +735,8 @@ input_reference = (图片文件，可选)</pre>
                 <el-tooltip placement="top" popper-class="cfg-tip-popper">
                   <template #content>
                     <div class="cfg-tip-content">
-                      接口路径，追加在 Base URL 之后。<br>
-                      <b>预设厂商</b>（火山 / 通义 / NanoBanana）留空，系统自动推断。<br>
+                      相对路径会追加在 Base URL 之后；完整 http(s) URL 会原样使用。<br>
+                      <b>火山视频</b>预填 /contents/generations/tasks，允许自行修改。<br>
                       <b>视频自定义厂商</b>必须填写，如 /v1/videos/generations<br>
                       <b>NanoBanana 代理</b>填写代理路径，如 /fal-ai/nano-banana
                     </div>
@@ -699,7 +745,7 @@ input_reference = (图片文件，可选)</pre>
                 </el-tooltip>
               </span>
             </template>
-            <el-input v-model="form.endpoint" :placeholder="form.service_type === 'video' ? '自定义视频厂商必填，如 /v1/videos/generations；预设厂商留空' : '代理或特殊厂商时填写，如 /fal-ai/nano-banana；预设厂商留空'" />
+            <el-input v-model="form.endpoint" :placeholder="form.service_type === 'video' ? '相对路径或完整 URL，如 /contents/generations/tasks' : '代理或特殊厂商时填写，如 /fal-ai/nano-banana；预设厂商留空'" />
           </el-form-item>
           <el-form-item>
             <template #label>
@@ -707,8 +753,8 @@ input_reference = (图片文件，可选)</pre>
                 <el-tooltip placement="top" popper-class="cfg-tip-popper">
                   <template #content>
                     <div class="cfg-tip-content">
-                      查询任务状态的接口路径，{taskId} 会被替换为实际任务 ID。<br>
-                      <b>预设厂商</b>留空即可，由系统自动推断。<br>
+                      查询任务状态的接口路径，{id}、{taskId} 或 {task_id} 会被替换为实际任务 ID。<br>
+                      <b>火山视频</b>预填 /contents/generations/tasks/{id}，允许自行修改。<br>
                       <b>视频自定义厂商</b>必须填写，如 /v1/video/tasks/{taskId}<br>
                       <b>图片/NanoBanana</b> 代理若不支持轮询可留空
                     </div>
@@ -717,14 +763,52 @@ input_reference = (图片文件，可选)</pre>
                 </el-tooltip>
               </span>
             </template>
-            <el-input v-model="form.query_endpoint" placeholder="自定义视频厂商必填，如 /v1/video/tasks/{taskId}；预设厂商留空" />
+            <el-input v-model="form.query_endpoint" placeholder="相对路径或完整 URL，如 /contents/generations/tasks/{id}" />
           </el-form-item>
+          <template v-if="form.service_type === 'video' && ['volces', 'volcengine', 'volc'].includes(String(form.provider || '').toLowerCase())">
+            <el-form-item>
+              <template #label>
+                <span class="form-label-tip">任务列表端点
+                  <el-tooltip placement="top" popper-class="cfg-tip-popper">
+                    <template #content>
+                      <div class="cfg-tip-content">
+                        用于读取视频任务列表和执行连接测试。<br>
+                        相对路径会与 Base URL 拼接一次；完整 http(s) URL 会原样使用。
+                      </div>
+                    </template>
+                    <el-icon class="tip-icon"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
+              <el-input v-model="form.task_list_endpoint" placeholder="/contents/generations/tasks" />
+            </el-form-item>
+            <el-form-item>
+              <template #label>
+                <span class="form-label-tip">取消/删除端点
+                  <el-tooltip placement="top" popper-class="cfg-tip-popper">
+                    <template #content>
+                      <div class="cfg-tip-content">
+                        使用 DELETE 请求取消或删除指定视频任务。<br>
+                        支持 {id}、{taskId} 或 {task_id} 占位符；相对路径会与 Base URL 拼接一次。
+                      </div>
+                    </template>
+                    <el-icon class="tip-icon"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
+              <el-input v-model="form.task_delete_endpoint" placeholder="/contents/generations/tasks/{id}" />
+            </el-form-item>
+          </template>
         </template>
 
-        <!-- 接口地址预览：选择厂商/协议后自动展示，帮助用户核对 -->
-        <div v-if="endpointPreviewInfo" class="endpoint-preview-box" :class="{ 'ep-box-gemini': endpointPreviewInfo.isGemini }">
+        <!-- 非火山视频服务保留地址预览；火山视频只展示上方四个实际生效的可编辑端点，避免两套重复配置。 -->
+        <div
+          v-if="endpointPreviewInfo && !(form.service_type === 'video' && ['volces', 'volcengine', 'volc'].includes(String(form.provider || '').toLowerCase()))"
+          class="endpoint-preview-box"
+          :class="{ 'ep-box-gemini': endpointPreviewInfo.isGemini }"
+        >
           <div class="ep-preview-header">
-            <span>📌 系统将使用以下接口地址</span>
+            <span class="icon-label"><el-icon><InfoFilled /></el-icon>系统将使用以下接口地址</span>
             <span v-if="endpointPreviewInfo.isGemini" class="ep-auto-badge ep-badge-gemini">Gemini 固定模式</span>
             <span v-else-if="endpointPreviewInfo.isJimeng2Auth" class="ep-auto-badge">即梦2角色认证</span>
             <span v-else-if="endpointPreviewInfo.isAuto && form.service_type !== 'text'" class="ep-auto-badge">自动推断</span>
@@ -737,11 +821,19 @@ input_reference = (图片文件，可选)</pre>
             <span class="ep-label">查询地址：</span>
             <code class="ep-url">{{ endpointPreviewInfo.query }}</code>
           </div>
-          <p v-if="endpointPreviewInfo.isGemini" class="ep-tip ep-tip-warn">
-            ⚠️ Gemini 端点由系统根据模型名固定生成，上方「提交端点」和「查询端点」字段对 Gemini 无效，填了也不生效。
+          <div v-if="endpointPreviewInfo.list" class="ep-row">
+            <span class="ep-label">任务列表：</span>
+            <code class="ep-url">{{ endpointPreviewInfo.list }}</code>
+          </div>
+          <div v-if="endpointPreviewInfo.cancel" class="ep-row">
+            <span class="ep-label">取消/删除：</span>
+            <code class="ep-url">{{ endpointPreviewInfo.cancel }}</code>
+          </div>
+          <p v-if="endpointPreviewInfo.isGemini" class="ep-tip ep-tip-warn icon-label">
+            <el-icon><WarningFilled /></el-icon>Gemini 端点由系统根据模型名固定生成，上方「提交端点」和「查询端点」字段对 Gemini 无效，填了也不生效。
           </p>
           <p v-else-if="endpointPreviewInfo.isJimeng2Auth" class="ep-tip">角色「SD2认证」将调用上述地址注册素材（POST 创建、GET 查询状态）。</p>
-          <p v-else class="ep-tip">以上为系统推断的实际调用地址（可手动填写上方端点字段来覆盖）</p>
+          <p v-else class="ep-tip">相对端点仅追加一次 Base URL；完整 http(s) 地址将原样执行，不会被 Base URL 覆盖或改写。</p>
         </div>
 
         <template v-if="form.service_type !== 'jimeng2_character_auth'">
@@ -858,14 +950,16 @@ input_reference = (图片文件，可选)</pre>
     <!-- 一键配置通义 -->
     <el-dialog
       v-model="oneKeyTongyiVisible"
+      append-to-body
       title="一键配置通义千问 / 万象（不推荐）"
-      width="520px"
+      width="680px"
+      class="ai-config-quick-dialog"
       :close-on-click-modal="false"
       @closed="oneKeyTongyiKey = ''"
     >
       <div class="one-key-help">
         <div class="one-key-section">
-          <div class="one-key-section-title">📋 将自动创建以下配置</div>
+          <div class="one-key-section-title icon-label"><el-icon><List /></el-icon>将自动创建以下配置</div>
           <ul class="one-key-list">
             <li><b>文本/对话</b>：通义千问（qwen-plus）— 生成故事剧本</li>
             <li><b>文本生成图片</b>：通义万象（wan2.6-image）— 角色/场景/道具图</li>
@@ -875,14 +969,14 @@ input_reference = (图片文件，可选)</pre>
           </ul>
         </div>
         <div class="one-key-section">
-          <div class="one-key-section-title">🔑 如何申请 API Key</div>
+          <div class="one-key-section-title icon-label"><el-icon><Key /></el-icon>如何申请 API Key</div>
           <ol class="one-key-list">
             <li>前往阿里云百炼控制台：<a href="https://bailian.console.aliyun.com/" target="_blank" class="one-key-link">bailian.console.aliyun.com</a></li>
             <li>注册/登录阿里云账号，开通「百炼」服务（新用户有免费额度）</li>
             <li>左侧菜单点击「API Key」→「创建 API Key」</li>
             <li>复制生成的 Key（格式：<code>sk-xxxxxxxx</code>）填入下方</li>
           </ol>
-          <p class="one-key-note">💡 通义一个 Key 同时支持文本、图片、视频等所有服务</p>
+          <p class="one-key-note icon-label"><el-icon><InfoFilled /></el-icon>通义一个 Key 同时支持文本、图片、视频等所有服务</p>
         </div>
       </div>
       <el-form label-width="0" style="margin-top: 8px">
@@ -907,14 +1001,16 @@ input_reference = (图片文件，可选)</pre>
     <!-- 一键配置火山 -->
     <el-dialog
       v-model="oneKeyVolcVisible"
+      append-to-body
       title="一键配置火山引擎（方舟）"
-      width="520px"
+      width="680px"
+      class="ai-config-quick-dialog"
       :close-on-click-modal="false"
       @closed="oneKeyVolcKey = ''"
     >
       <div class="one-key-help">
         <div class="one-key-section">
-          <div class="one-key-section-title">📋 将自动创建以下配置</div>
+          <div class="one-key-section-title icon-label"><el-icon><List /></el-icon>将自动创建以下配置</div>
           <ul class="one-key-list">
             <li><b>文本/对话</b>：DeepSeek V3（deepseek-v3-2-251201）— 生成故事剧本</li>
             <li><b>文本生成图片</b>：即梦 4.5（doubao-seedream-4-5-251128）— 角色/场景/道具图</li>
@@ -923,15 +1019,15 @@ input_reference = (图片文件，可选)</pre>
           </ul>
         </div>
         <div class="one-key-section">
-          <div class="one-key-section-title">🔑 如何申请 API Key</div>
+          <div class="one-key-section-title icon-label"><el-icon><Key /></el-icon>如何申请 API Key</div>
           <ol class="one-key-list">
             <li>前往火山引擎方舟控制台：<a href="https://console.volcengine.com/ark" target="_blank" class="one-key-link">console.volcengine.com/ark</a></li>
             <li>注册/登录字节跳动火山引擎账号（新用户有免费 token 额度）</li>
             <li>左侧菜单点击「API Key 管理」→「创建 API Key」</li>
             <li>复制生成的 Key 填入下方</li>
           </ol>
-          <p class="one-key-note">💡 方舟平台一个 Key 同时支持豆包文本、即梦图片与视频等所有服务</p>
-          <p class="one-key-note">⚠️ 视频生成需在控制台「开通」对应模型（即梦 Seedance）后方可使用</p>
+          <p class="one-key-note icon-label"><el-icon><InfoFilled /></el-icon>方舟平台一个 Key 同时支持豆包文本、即梦图片与视频等所有服务</p>
+          <p class="one-key-note icon-label"><el-icon><WarningFilled /></el-icon>视频生成需在控制台「开通」对应模型（即梦 Seedance）后方可使用</p>
         </div>
       </div>
       <el-form label-width="0" style="margin-top: 8px">
@@ -956,14 +1052,16 @@ input_reference = (图片文件，可选)</pre>
     <!-- 一键配置 Agnes -->
     <el-dialog
       v-model="oneKeyAgnesVisible"
+      append-to-body
       title="一键配置 Agnes AI"
-      width="520px"
+      width="680px"
+      class="ai-config-quick-dialog"
       :close-on-click-modal="false"
       @closed="oneKeyAgnesKey = ''"
     >
       <div class="one-key-help">
         <div class="one-key-section">
-          <div class="one-key-section-title">📋 将自动创建以下配置</div>
+          <div class="one-key-section-title icon-label"><el-icon><List /></el-icon>将自动创建以下配置</div>
           <ul class="one-key-list">
             <li><b>文本/对话</b>：Agnes 2.0 Flash（agnes-2.0-flash）— 生成故事剧本</li>
             <li><b>文本生成图片</b>：Agnes Image 2.1 Flash — 角色/场景/道具图</li>
@@ -972,14 +1070,14 @@ input_reference = (图片文件，可选)</pre>
           </ul>
         </div>
         <div class="one-key-section">
-          <div class="one-key-section-title">🔑 如何申请 API Key</div>
+          <div class="one-key-section-title icon-label"><el-icon><Key /></el-icon>如何申请 API Key</div>
           <ol class="one-key-list">
             <li>前往 Agnes 平台：<a href="https://platform.agnes-ai.com/settings/apiKeys" target="_blank" class="one-key-link">platform.agnes-ai.com/settings/apiKeys</a></li>
             <li>注册/登录账号，进入 Settings → API Keys</li>
             <li>点击「Create new secret key」创建密钥</li>
             <li>复制 Key 填入下方</li>
           </ol>
-          <p class="one-key-note">💡 一个 Key 同时支持文本、图片、视频；接口文档见 <a href="https://agnes-ai.com/doc/agnes-20-flash" target="_blank" class="one-key-link">agnes-ai.com/doc</a></p>
+          <p class="one-key-note icon-label"><el-icon><InfoFilled /></el-icon>一个 Key 同时支持文本、图片、视频；接口文档见 <a href="https://agnes-ai.com/doc/agnes-20-flash" target="_blank" class="one-key-link">agnes-ai.com/doc</a></p>
         </div>
       </div>
       <el-form label-width="0" style="margin-top: 8px">
@@ -1004,8 +1102,9 @@ input_reference = (图片文件，可选)</pre>
     <!-- 即梦2角色认证：素材列表 -->
     <el-dialog
       v-model="jimeng2AssetsDialogVisible"
+      append-to-body
       title="素材库列表（GET /api/business/v1/assets）"
-      width="720px"
+      width="900px"
       class="jimeng2-assets-dialog"
       destroy-on-close
       @closed="onJimeng2AssetsDialogClosed"
@@ -1039,7 +1138,7 @@ input_reference = (图片文件，可选)</pre>
     </el-dialog>
 
     <!-- 测试连接 -->
-    <el-dialog v-model="testVisible" title="测试连接" width="420px">
+    <el-dialog v-model="testVisible" append-to-body title="测试连接" width="480px" class="ai-config-test-dialog">
       <p v-if="testResult === null">正在测试…</p>
       <template v-else-if="testResult">
         <el-alert
@@ -1066,7 +1165,7 @@ input_reference = (图片文件，可选)</pre>
     </el-dialog>
 
     <!-- 一键换Key（锁定模式） -->
-    <el-dialog v-model="bulkKeyVisible" title="一键换Key" width="440px" :close-on-click-modal="false">
+    <el-dialog v-model="bulkKeyVisible" append-to-body title="一键换Key" width="520px" class="ai-config-key-dialog" :close-on-click-modal="false">
       <el-alert
         type="warning"
         :closable="false"
@@ -1096,15 +1195,67 @@ input_reference = (图片文件，可选)</pre>
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, MagicStick, QuestionFilled, Download, Upload, Delete, ChatDotRound, Picture, Film, VideoCamera, Key, Microphone, Folder } from '@element-plus/icons-vue'
+import { Plus, MagicStick, QuestionFilled, Download, Upload, Delete, ChatDotRound, Picture, Film, VideoCamera, Key, Microphone, Folder, Lock, InfoFilled, List, WarningFilled, Check, Lightning } from '@element-plus/icons-vue'
 import { aiAPI } from '@/api/ai'
+import { videosAPI } from '@/api/videos'
 import { generationSettingsAPI } from '@/api/prompts'
 import PromptEditor from '@/components/PromptEditor.vue'
 import SceneModelMap from '@/components/SceneModelMap.vue'
 import Sd2AssetManagement from '@/components/Sd2AssetManagement.vue'
+import TosStorageSettings from '@/components/TosStorageSettings.vue'
 
-const activeTab = ref('configs')
+const props = defineProps({
+  pageMode: { type: Boolean, default: false },
+  modelValue: { type: String, default: 'configs' },
+})
+const emit = defineEmits(['update:modelValue'])
+const localActiveTab = ref('configs')
+const activeTab = computed({
+  get: () => (props.pageMode ? props.modelValue : localActiveTab.value),
+  set: (value) => {
+    if (props.pageMode) emit('update:modelValue', value)
+    else localActiveTab.value = value
+  },
+})
 const importFileRef = ref(null)
+const volcTasksVisible = ref(false)
+const volcTasksLoading = ref(false)
+const volcTaskDeleting = ref('')
+const volcTaskStatus = ref('')
+const volcTasks = ref([])
+
+async function loadVolcTasks() {
+  volcTasksLoading.value = true
+  try {
+    const result = await videosAPI.providerTasks({ page_num: 1, page_size: 100, status: volcTaskStatus.value || undefined })
+    volcTasks.value = result?.items || []
+  } catch (error) {
+    volcTasks.value = []
+    ElMessage.error(error?.message || '火山任务列表查询失败')
+  } finally {
+    volcTasksLoading.value = false
+  }
+}
+
+function openVolcTasks() {
+  volcTasksVisible.value = true
+  loadVolcTasks()
+}
+
+async function removeVolcTask(row) {
+  try {
+    const verb = row.status === 'queued' ? '取消' : '删除'
+    await ElMessageBox.confirm(`确定${verb}火山任务 ${row.id}？`, `${verb}视频任务`, { type: 'warning' })
+    volcTaskDeleting.value = row.id
+    await videosAPI.deleteProviderTask(row.id)
+    ElMessage.success(`${verb}请求已提交`)
+    await loadVolcTasks()
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') ElMessage.error(error?.message || '操作失败')
+  } finally {
+    volcTaskDeleting.value = ''
+  }
+}
 
 // ---- 生成设置 ----
 const genConcurrencyInput = ref(3)
@@ -1180,6 +1331,8 @@ const form = ref({
   api_key: '',
   endpoint: '',
   query_endpoint: '',
+  task_list_endpoint: '',
+  task_delete_endpoint: '',
   modelText: '',
   default_model: '',
   deepseek_thinking: 'disabled',
@@ -1329,7 +1482,7 @@ const providerConfigs = {
     { id: 'ffir', name: '飞儿API / 可灵 Omni-Video (ffir.cn)', models: ['kling-video-o1', 'kling-v3-omni'] },
     { id: 'kling', name: '可灵 Kling', models: ['kling-omni-video', 'kling-video', 'kling-motion-control'] },
     { id: 'vidu', name: 'Vidu', models: ['viduq2', 'viduq2-pro', 'viduq2-turbo', 'viduq3-pro'] },
-    { id: 'volces', name: '火山引擎', models: ['doubao-seedance-2-0-260128', 'doubao-seedance-2-0-fast-260128', 'doubao-seedance-1-5-pro-251215', 'doubao-seedance-1-0-lite-i2v-250428', 'doubao-seedance-1-0-lite-t2v-250428', 'doubao-seedance-1-0-pro-250528', 'doubao-seedance-1-0-pro-fast-251015'] },
+    { id: 'volces', name: '火山引擎', models: ['doubao-seedance-2-0-260128', 'doubao-seedance-2-0-fast-260128', 'doubao-seedance-2-0-mini-260615', 'doubao-seedance-1-5-pro-251215', 'doubao-seedance-1-0-lite-i2v-250428', 'doubao-seedance-1-0-lite-t2v-250428', 'doubao-seedance-1-0-pro-250528', 'doubao-seedance-1-0-pro-fast-251015'] },
     // { id: 'chatfire', name: 'Chatfire', models: ['doubao-seedance-1-5-pro-251215', 'doubao-seedance-1-0-lite-i2v-250428', 'doubao-seedance-1-0-lite-t2v-250428', 'doubao-seedance-1-0-pro-250528', 'doubao-seedance-1-0-pro-fast-251015', 'sora-2', 'sora-2-pro'] },
     { id: 'minimax', name: 'MiniMax 海螺', models: ['MiniMax-Hailuo-2.3', 'MiniMax-Hailuo-2.3-Fast', 'MiniMax-Hailuo-02'] },
     { id: 'gemini', name: 'Google Gemini (Veo)', models: ['veo-3.1-generate-preview', 'veo-3.0-generate-preview', 'veo-3.0-fast-generate-preview'] },
@@ -1457,7 +1610,7 @@ const availableProviderOptions = computed(() => {
   if (editingId.value && current && current !== CUSTOM_PROVIDER_SENTINEL && !listByType.some((p) => p.id === current)) {
     result = [{ id: current, name: current + ' (当前)', models: [] }, ...result]
   }
-  result.push({ id: CUSTOM_PROVIDER_SENTINEL, name: '✏️ 自定义（直接输入厂商名）', models: [] })
+  result.push({ id: CUSTOM_PROVIDER_SENTINEL, name: '自定义（直接输入厂商名）', models: [] })
   return result
 })
 
@@ -1472,7 +1625,7 @@ const availableModels = computed(() => {
 
 /** 根据当前厂商/协议/base_url 推算实际将使用的接口地址，供用户核对 */
 const endpointPreviewInfo = computed(() => {
-  const { provider, api_protocol, base_url, service_type, endpoint, query_endpoint } = form.value
+  const { provider, api_protocol, base_url, service_type, endpoint, query_endpoint, task_list_endpoint, task_delete_endpoint } = form.value
   const p = String(provider || '').toLowerCase()
   const proto = api_protocol || providerProtocolMap[p] || ''
   const base = (base_url || '').replace(/\/$/, '')
@@ -1524,7 +1677,7 @@ const endpointPreviewInfo = computed(() => {
     } else if (proto === 'volcengine_omni') {
       submitPath = '/contents/generations/tasks'
     } else if (proto === 'volcengine' || p === 'volces' || p === 'volcengine') {
-      submitPath = '/videos/generations'
+      submitPath = '/contents/generations/tasks'
     } else if (proto === 'dashscope' || p === 'dashscope') {
       submitPath = '/api/v1/services/aigc/video-generation/video-synthesis'
     } else if (proto === 'gemini' || p === 'gemini') {
@@ -1567,9 +1720,9 @@ const endpointPreviewInfo = computed(() => {
     if (query_endpoint) {
       queryPath = query_endpoint
     } else if (proto === 'volcengine_omni') {
-      queryPath = '/contents/generations/tasks/{taskId}'
+      queryPath = '/contents/generations/tasks/{id}'
     } else if (proto === 'volcengine' || p === 'volces' || p === 'volcengine') {
-      queryPath = '/tasks/{taskId}/info'
+      queryPath = '/contents/generations/tasks/{id}'
     } else if (proto === 'dashscope' || p === 'dashscope') {
       queryPath = '/api/v1/tasks/{taskId}/info'
     } else if (proto === 'vidu' || p === 'vidu') {
@@ -1599,13 +1752,22 @@ const endpointPreviewInfo = computed(() => {
     }
   }
 
-  const submitUrl = base ? (base + submitPath) : ('(未填 Base URL)' + submitPath)
-  const queryUrl = queryPath ? (base ? base + queryPath : '(未填 Base URL)' + queryPath) : null
+  const resolvePreviewUrl = (path) => {
+    const value = String(path || '').trim()
+    if (!value) return null
+    if (/^https?:\/\//i.test(value)) return value
+    return base ? `${base}/${value.replace(/^\/+/, '')}` : `(未填 Base URL)/${value.replace(/^\/+/, '')}`
+  }
+  const submitUrl = resolvePreviewUrl(submitPath)
+  const queryUrl = resolvePreviewUrl(queryPath)
 
   if (!submitPath) return null
+  const isOfficialVolcVideo = service_type === 'video' && ['volces', 'volcengine', 'volc'].includes(p)
   return {
     submit: submitUrl,
     query: queryUrl,
+    list: isOfficialVolcVideo ? `${resolvePreviewUrl(task_list_endpoint || '/contents/generations/tasks')}?page_num=1&page_size=100` : null,
+    cancel: isOfficialVolcVideo ? `${resolvePreviewUrl(task_delete_endpoint || '/contents/generations/tasks/{id}')}  （DELETE）` : null,
     isAuto: !endpoint  // 端点是自动推断的（非用户手填）
   }
 })
@@ -1636,6 +1798,12 @@ function onProviderChange(providerId) {
   }
   // 自动填充接口规范
   form.value.api_protocol = providerProtocolMap[providerId] || (st === 'text' ? '' : 'openai')
+  if (st === 'video' && ['volces', 'volcengine', 'volc'].includes(String(providerId).toLowerCase())) {
+    form.value.endpoint = '/contents/generations/tasks'
+    form.value.query_endpoint = '/contents/generations/tasks/{id}'
+    form.value.task_list_endpoint = '/contents/generations/tasks'
+    form.value.task_delete_endpoint = '/contents/generations/tasks/{id}'
+  }
   if (st === 'video' && providerId === 'jimeng_ai_api') {
     form.value.endpoint = ''
     form.value.query_endpoint = ''
@@ -1737,6 +1905,8 @@ function resetForm() {
     api_key: '',
     endpoint: '',
     query_endpoint: '',
+    task_list_endpoint: '',
+    task_delete_endpoint: '',
     modelText: '',
     default_model: '',
     deepseek_thinking: 'disabled',
@@ -1768,6 +1938,8 @@ function openEdit(row) {
   let kling_access_key = ''
   let kling_secret_key = ''
   let kling_secret_key_base64 = false
+  let task_list_endpoint = ''
+  let task_delete_endpoint = ''
   const deepseekSettings = resolveDeepSeekFormSettings(row)
   if (row.settings) {
     try {
@@ -1781,7 +1953,17 @@ function openEdit(row) {
         kling_secret_key = s.kling_secret_key || ''
         kling_secret_key_base64 = !!s.kling_secret_key_base64
       }
+      if (row.service_type === 'video') {
+        task_list_endpoint = s.task_list_endpoint || ''
+        task_delete_endpoint = s.task_delete_endpoint || ''
+      }
     } catch (_) {}
+  }
+  const isOfficialVolcVideo = row.service_type === 'video'
+    && ['volces', 'volcengine', 'volc'].includes(String(row.provider || '').toLowerCase())
+  if (isOfficialVolcVideo) {
+    task_list_endpoint ||= '/contents/generations/tasks'
+    task_delete_endpoint ||= '/contents/generations/tasks/{id}'
   }
   form.value = {
     service_type: row.service_type,
@@ -1792,6 +1974,8 @@ function openEdit(row) {
     api_key: row.api_key,
     endpoint: row.endpoint || '',
     query_endpoint: row.query_endpoint || '',
+    task_list_endpoint,
+    task_delete_endpoint,
     modelText: modelList.join('\n'),
     default_model: defaultInList ? row.default_model : (modelList[0] || ''),
     deepseek_thinking: deepseekSettings.thinking,
@@ -1818,41 +2002,40 @@ async function submit() {
     const defaultModel = form.value.default_model && modelList.includes(form.value.default_model)
       ? form.value.default_model
       : modelList[0] || null
-    // TTS / 可灵 Omni 官方 AKSK / DeepSeek V4 参数打包进 settings
-    let settings = undefined
+    // 在同一个 settings 对象上更新各服务的扩展项，避免保存某一组字段时覆盖另一组。
+    const previous = editingId.value ? list.value.find((r) => r.id === editingId.value) : null
+    const settingsObject = parseSettings(previous?.settings)
     if (form.value.service_type === 'tts') {
-      const s = {}
-      if (form.value.voice_id) s.voice_id = form.value.voice_id
-      if (form.value.group_id) s.group_id = form.value.group_id
-      settings = Object.keys(s).length ? JSON.stringify(s) : null
-    } else if (form.value.service_type === 'video' && form.value.api_protocol === 'kling_omni') {
-      let baseS = {}
-      if (editingId.value) {
-        const prev = list.value.find((r) => r.id === editingId.value)
-        if (prev?.settings) {
-          try {
-            baseS = JSON.parse(prev.settings)
-          } catch (_) {}
-        }
-      }
-      if ((form.value.kling_access_key || '').trim()) baseS.kling_access_key = form.value.kling_access_key.trim()
-      else delete baseS.kling_access_key
-      if ((form.value.kling_secret_key || '').trim()) baseS.kling_secret_key = form.value.kling_secret_key.trim()
-      else delete baseS.kling_secret_key
-      if (form.value.kling_secret_key_base64) baseS.kling_secret_key_base64 = true
-      else delete baseS.kling_secret_key_base64
-      settings = Object.keys(baseS).length ? JSON.stringify(baseS) : null
-    } else if (isDeepSeekOfficialForm.value) {
-      const prev = editingId.value ? list.value.find((r) => r.id === editingId.value) : null
-      const baseS = parseSettings(prev?.settings)
-      baseS.deepseek_thinking = form.value.deepseek_thinking === 'enabled' ? 'enabled' : 'disabled'
-      if (baseS.deepseek_thinking === 'enabled') {
-        baseS.deepseek_reasoning_effort = form.value.deepseek_reasoning_effort === 'max' ? 'max' : 'high'
-      } else {
-        delete baseS.deepseek_reasoning_effort
-      }
-      settings = Object.keys(baseS).length ? JSON.stringify(baseS) : null
+      if (form.value.voice_id) settingsObject.voice_id = form.value.voice_id
+      else delete settingsObject.voice_id
+      if (form.value.group_id) settingsObject.group_id = form.value.group_id
+      else delete settingsObject.group_id
     }
+    if (form.value.service_type === 'video' && form.value.api_protocol === 'kling_omni') {
+      if ((form.value.kling_access_key || '').trim()) settingsObject.kling_access_key = form.value.kling_access_key.trim()
+      else delete settingsObject.kling_access_key
+      if ((form.value.kling_secret_key || '').trim()) settingsObject.kling_secret_key = form.value.kling_secret_key.trim()
+      else delete settingsObject.kling_secret_key
+      if (form.value.kling_secret_key_base64) settingsObject.kling_secret_key_base64 = true
+      else delete settingsObject.kling_secret_key_base64
+    }
+    const isOfficialVolcVideo = form.value.service_type === 'video'
+      && ['volces', 'volcengine', 'volc'].includes(String(form.value.provider || '').toLowerCase())
+    if (isOfficialVolcVideo) {
+      if ((form.value.task_list_endpoint || '').trim()) settingsObject.task_list_endpoint = form.value.task_list_endpoint.trim()
+      else delete settingsObject.task_list_endpoint
+      if ((form.value.task_delete_endpoint || '').trim()) settingsObject.task_delete_endpoint = form.value.task_delete_endpoint.trim()
+      else delete settingsObject.task_delete_endpoint
+    }
+    if (isDeepSeekOfficialForm.value) {
+      settingsObject.deepseek_thinking = form.value.deepseek_thinking === 'enabled' ? 'enabled' : 'disabled'
+      if (settingsObject.deepseek_thinking === 'enabled') {
+        settingsObject.deepseek_reasoning_effort = form.value.deepseek_reasoning_effort === 'max' ? 'max' : 'high'
+      } else {
+        delete settingsObject.deepseek_reasoning_effort
+      }
+    }
+    const settings = Object.keys(settingsObject).length ? JSON.stringify(settingsObject) : ''
     const payload = {
       service_type: form.value.service_type,
       name: form.value.name,
@@ -1866,7 +2049,7 @@ async function submit() {
       default_model: defaultModel,
       priority: form.value.priority,
       is_default: form.value.is_default,
-      ...(settings !== undefined ? { settings } : {}),
+      settings,
     }
     if (editingId.value) {
       await aiAPI.update(editingId.value, payload)
@@ -1973,6 +2156,7 @@ async function openTest(row) {
       model: Array.isArray(row.model) ? row.model[0] : row.model,
       provider: row.provider,
       endpoint: row.endpoint,
+      query_endpoint: row.query_endpoint,
       service_type: row.service_type,
       settings: row.settings
     })
@@ -2249,7 +2433,7 @@ onMounted(() => {
 /* 过渡动画 */
 .fade-slide-enter-active,
 .fade-slide-leave-active {
-  transition: all 0.2s ease;
+  transition: opacity var(--motion-fast) var(--motion-ease-out), transform var(--motion-fast) var(--motion-ease-out);
 }
 .fade-slide-enter-from,
 .fade-slide-leave-to {
@@ -2630,6 +2814,17 @@ code {
   line-height: 1.8;
 }
 .gs-tip-note {
+  color: #909399;
+  font-size: 12px;
+}
+.provider-task-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.provider-task-toolbar > span {
+  margin-left: auto;
   color: #909399;
   font-size: 12px;
 }

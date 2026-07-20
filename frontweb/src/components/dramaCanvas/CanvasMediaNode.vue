@@ -21,7 +21,7 @@
       </template>
       <template v-else-if="data.kind === 'audio'">
         <div class="audio-wrap">
-          <span>🎵</span>
+          <el-icon><Headset /></el-icon>
           <span>{{ data.audioType === 'narration' ? '旁白' : '对白' }}</span>
         </div>
       </template>
@@ -44,6 +44,7 @@ import { Handle, Position } from '@vue-flow/core'
 import { useCanvasContext } from '@/composables/useCanvasContext'
 import CanvasMediaPanel from './CanvasMediaPanel.vue'
 import CanvasNodeStatusOverlay from './CanvasNodeStatusOverlay.vue'
+import { Headset } from '@element-plus/icons-vue'
 
 const props = defineProps({
   id: { type: String, required: true },

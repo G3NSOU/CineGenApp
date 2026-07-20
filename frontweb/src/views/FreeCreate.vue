@@ -15,8 +15,12 @@
       <!-- 左侧：输入面板 -->
       <div class="input-panel">
         <el-tabs v-model="mode" class="mode-tabs">
-          <el-tab-pane label="🎨 生成图片" name="image" />
-          <el-tab-pane label="🎬 生成视频" name="video" />
+          <el-tab-pane name="image">
+            <template #label><span class="tab-label"><el-icon><Picture /></el-icon>生成图片</span></template>
+          </el-tab-pane>
+          <el-tab-pane name="video">
+            <template #label><span class="tab-label"><el-icon><VideoCamera /></el-icon>生成视频</span></template>
+          </el-tab-pane>
         </el-tabs>
 
         <div class="form-section">
@@ -147,7 +151,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Picture, MagicStick, Loading, CircleClose } from '@element-plus/icons-vue'
+import { ArrowLeft, Picture, MagicStick, Loading, CircleClose, VideoCamera } from '@element-plus/icons-vue'
 import { imagesAPI } from '@/api/images'
 import { videosAPI } from '@/api/videos'
 import { uploadAPI } from '@/api/upload'

@@ -325,7 +325,7 @@ onMounted(loadMedia)
   overflow: hidden;
   border: 2px solid transparent;
   cursor: pointer;
-  transition: all .2s;
+  transition: transform var(--motion-fast) var(--motion-ease-out), border-color var(--motion-fast) var(--motion-ease-out), box-shadow var(--motion-fast) var(--motion-ease-out);
   box-shadow: 0 1px 4px rgba(0,0,0,.06);
 }
 

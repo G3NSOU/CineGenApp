@@ -1,12 +1,10 @@
 <template>
   <div class="film-create" :class="{ 'sidebar-collapsed': navCollapsed }">
-    <!-- 顶部 -->
-    <header class="header">
-      <div class="header-inner">
-        <h1 class="logo" @click="goList">
-          <span class="logo-main">本地短剧助手</span>
-          <span class="logo-sub">LocalMiniDrama</span>
-        </h1>
+    <Teleport to="#app-header-context">
+      <div class="cgp-route-context" :key="`film-${dramaId || 'new'}`">
+        <el-button text class="cgp-context-home" @click="goList">
+          <el-icon><ArrowLeft /></el-icon>项目
+        </el-button>
         <span class="breadcrumb-sep">›</span>
         <span class="page-title">{{ dramaId ? (store.drama?.title || '项目') : '新建故事' }}</span>
         <el-select
@@ -34,23 +32,14 @@
           <el-icon><Grid /></el-icon>
           画布模式
         </el-button>
-        <div class="header-actions">
-          <el-button class="btn-theme" :title="isDark ? '切换到浅色模式' : '切换到暗色模式'" @click="toggleTheme">
-            <el-icon><Sunny v-if="isDark" /><Moon v-else /></el-icon>
-            {{ isDark ? '浅色' : '暗色' }}
-          </el-button><el-button class="btn-ai-config" @click="showAiConfigDialog = true">
-            <el-icon><Setting /></el-icon>
-            AI配置
-          </el-button>
-        </div>
       </div>
-    </header>
+    </Teleport>
 
     <!-- 左侧固定侧边栏 -->
-    <nav class="quick-nav" :class="{ collapsed: navCollapsed }" aria-label="快捷导航">
+    <nav ref="quickNavRef" class="quick-nav" :class="{ collapsed: navCollapsed }" aria-label="快捷导航">
       <div class="nav-sidebar-header">
         <span v-if="!navCollapsed" class="nav-sidebar-title">导航</span>
-        <div class="nav-toggle" :title="navCollapsed ? '展开导航' : '收起导航'" @click="toggleNav()">
+        <div class="nav-toggle" :title="navCollapsed ? '展开导航' : '收起导航'" @click="toggleNavAnimated">
           <el-icon><Expand v-if="navCollapsed" /><Fold v-else /></el-icon>
         </div>
       </div>
@@ -168,7 +157,7 @@
       </div>
     </nav>
 
-    <main class="main">
+    <main ref="mainRef" class="main">
       <!-- 角色/道具/场景上传图片用，单例放在外层避免 v-for 导致 ref 为数组 -->
       <input
         ref="resourceImageFileInput"
@@ -356,7 +345,7 @@
       <!-- 一键全流程生成 -->
       <section class="section card pipeline-section">
         <div class="one-click-actions">
-          <span class="one-click-label">🚀 一键全流程</span>
+          <span class="one-click-label"><el-icon><VideoPlay /></el-icon>一键全流程</span>
           <el-select v-model="projectAspectRatio" style="width: 130px" @change="() => saveProjectSettings(false)">
             <el-option label="16:9 横屏" value="16:9" />
             <el-option label="9:16 竖屏" value="9:16" />
@@ -399,8 +388,8 @@
             生成文本框架
           </el-button>
           <template v-if="pipelineRunning">
-            <el-button v-if="!pipelinePaused" type="warning" @click="pipelinePaused = true">⏸ 暂停</el-button>
-            <el-button v-else type="success" @click="onPipelineResume">▶ 继续</el-button>
+            <el-button v-if="!pipelinePaused" type="warning" @click="pipelinePaused = true"><el-icon><VideoPause /></el-icon>暂停</el-button>
+            <el-button v-else type="success" @click="onPipelineResume"><el-icon><VideoPlay /></el-icon>继续</el-button>
           </template>
         </div>
         <div v-if="pipelineRunning || pipelineErrorLog.length > 0" class="pipeline-status">
@@ -417,8 +406,8 @@
             <div class="pipeline-countdown-body">
               <p class="pipeline-countdown-msg">{{ pipelineCountdownMsg }}</p>
               <div class="pipeline-countdown-actions">
-                <el-button size="small" type="success" @click="skipPipelineCountdown">⚡ 立即开始下一阶段</el-button>
-                <el-button v-if="!pipelinePaused" size="small" type="warning" @click="pipelinePaused = true">⏸ 暂停倒计时</el-button>
+                <el-button size="small" type="success" @click="skipPipelineCountdown"><el-icon><VideoPlay /></el-icon>立即开始下一阶段</el-button>
+                <el-button v-if="!pipelinePaused" size="small" type="warning" @click="pipelinePaused = true"><el-icon><VideoPause /></el-icon>暂停倒计时</el-button>
                 <span v-else class="pipeline-countdown-paused">已暂停 — 点击右上角"继续"恢复</span>
               </div>
             </div>
@@ -912,10 +901,10 @@
                   <div style="max-width:320px;line-height:1.7">
                     <div style="font-weight:600;margin-bottom:4px">连贯帧模式说明</div>
                     <div>启用后批量视频顺序生成，每条视频的<b>末帧</b>自动截取并作为下一条视频的<b>首帧参考图</b>，减少镜头切换的跳跃感。</div>
-                    <div style="margin-top:8px;font-weight:600">⚠️ 需要模型支持图生视频（i2v）</div>
+                    <div class="icon-label" style="margin-top:8px;font-weight:600"><el-icon><WarningFilled /></el-icon>需要模型支持图生视频（i2v）</div>
                     <div style="margin-top:4px">
-                      ✅ 支持：kling-video、kling-omni-video、wan2.2-kf2v-flash、wan2.6-i2v-flash<br/>
-                      ❌ 不支持（末帧将被忽略）：wan2.6-t2v、wan2.6-r2v-flash、wanx2.1-vace-plus 等纯文生视频模型
+                      <span class="icon-label"><el-icon><Check /></el-icon>支持：kling-video、kling-omni-video、wan2.2-kf2v-flash、wan2.6-i2v-flash</span><br/>
+                      <span class="icon-label"><el-icon><Close /></el-icon>不支持（末帧将被忽略）：wan2.6-t2v、wan2.6-r2v-flash、wanx2.1-vace-plus 等纯文生视频模型</span>
                     </div>
                     <div style="margin-top:8px;color:#faad14">如当前视频模型不支持 i2v，启用此选项不会报错，但末帧衔接不会生效。</div>
                   </div>
@@ -986,7 +975,7 @@
             <span class="sb-ctrl-num">{{ i + 1 }}</span>
             <span class="sb-ctrl-title">{{ sb.title || '未命名分镜' }}</span>
             <el-tag v-if="sb.movement" size="small" effect="plain" type="info" class="sb-movement-tag">{{ getMovementLabel(sb.movement) }}</el-tag>
-            <el-button size="small" plain class="sb-ctrl-btn sb-ctrl-config-btn" @click="onOpenVideoParamsDialog(sb)">⚙ 分镜配置</el-button>
+            <el-button size="small" plain class="sb-ctrl-btn sb-ctrl-config-btn" @click="onOpenVideoParamsDialog(sb)"><el-icon><Setting /></el-icon>分镜配置</el-button>
             <el-button
               size="small"
               plain
@@ -1601,7 +1590,7 @@
             </div>
           </el-form-item>
         </div>
-        <p class="config-tip">文本/图片/视频使用的模型以「<el-link type="primary" underline="never" @click="showAiConfigDialog = true">AI 配置</el-link>」中设为默认的为准。</p>
+        <p class="config-tip">文本/图片/视频使用的模型以「<el-link type="primary" underline="never" @click="openAiConfigPage">AI 配置</el-link>」中设为默认的为准。</p>
       </section>
 
       <!-- 8. 合成视频 -->
@@ -1645,7 +1634,7 @@
           <div class="ref-image-zone">
             <div class="ref-image-box" @click="addPropAddRefFileInput?.click()" @drop.prevent="onRefImageDrop2('addProp', $event)" @dragover.prevent>
               <img v-if="addPropAddRefImage" :src="addPropAddRefImage.dataUrl" class="ref-preview-img" />
-              <div v-else class="ref-upload-hint"><span class="ref-upload-icon">🖼</span><span>点击或拖入参考图</span></div>
+              <div v-else class="ref-upload-hint"><el-icon class="ref-upload-icon"><Picture /></el-icon><span>点击或拖入参考图</span></div>
             </div>
             <div v-if="addPropAddRefImage" class="ref-actions">
               <el-button type="primary" size="small" :loading="extractingPropAddDesc" @click="doExtractFromRef2('addProp')">提取特征描述</el-button>
@@ -1695,7 +1684,7 @@
               <img v-else-if="editCharacterForm.id && (editCharacterForm.image_url || editCharacterForm.local_path)"
                 :src="assetImageUrl(editCharacterForm)"
                 class="ref-preview-img" style="opacity:0.5" />
-              <div v-else class="ref-upload-hint"><span class="ref-upload-icon">🖼</span><span>点击或拖入参考图</span></div>
+              <div v-else class="ref-upload-hint"><el-icon class="ref-upload-icon"><Picture /></el-icon><span>点击或拖入参考图</span></div>
             </div>
             <div v-if="addCharRefImage" class="ref-actions">
               <el-button type="primary" size="small" :loading="extractingCharAppearance" @click="doExtractFromRef('character')">提取特征描述</el-button>
@@ -1841,7 +1830,7 @@
                 class="ref-preview-img" />
               <img v-else-if="editPropForm.id && (editPropForm.image_url || editPropForm.local_path)"
                 :src="assetImageUrl(editPropForm)" class="ref-preview-img" style="opacity:0.5" />
-              <div v-else class="ref-upload-hint"><span class="ref-upload-icon">🖼</span><span>点击或拖入参考图</span></div>
+              <div v-else class="ref-upload-hint"><el-icon class="ref-upload-icon"><Picture /></el-icon><span>点击或拖入参考图</span></div>
             </div>
             <div v-if="addPropRefImage" class="ref-actions">
               <el-button type="primary" size="small" :loading="extractingPropDesc" @click="doExtractFromRef('prop')">提取特征描述</el-button>
@@ -1900,7 +1889,7 @@
                 class="ref-preview-img" />
               <img v-else-if="editSceneForm.id && (editSceneForm.image_url || editSceneForm.local_path)"
                 :src="assetImageUrl(editSceneForm)" class="ref-preview-img" style="opacity:0.5" />
-              <div v-else class="ref-upload-hint"><span class="ref-upload-icon">🖼</span><span>点击或拖入参考图</span></div>
+              <div v-else class="ref-upload-hint"><el-icon class="ref-upload-icon"><Picture /></el-icon><span>点击或拖入参考图</span></div>
             </div>
             <div v-if="addSceneRefImage" class="ref-actions">
               <el-button type="primary" size="small" :loading="extractingSceneDesc" @click="doExtractFromRef('scene')">提取特征描述</el-button>
@@ -2241,7 +2230,7 @@
     >
       <el-form v-if="sbPromptTarget" label-width="0" class="sb-prompt-dialog-form">
         <!-- 图片区 -->
-        <div class="sb-prompt-section-title">🖼 图片提示词</div>
+        <div class="sb-prompt-section-title"><el-icon><Picture /></el-icon>图片提示词</div>
         <el-form-item label="">
           <div style="width:100%">
             <div style="font-size:12px; color:#6b7280; margin-bottom:4px;">原始提示词（分镜生成时写入，仅供参考）</div>
@@ -2274,7 +2263,7 @@
           </div>
         </el-form-item>
         <!-- 视频区 -->
-        <div class="sb-prompt-section-title" style="margin-top:12px;">🎬 视频提示词</div>
+        <div class="sb-prompt-section-title" style="margin-top:12px;"><el-icon><VideoCamera /></el-icon>视频提示词</div>
         <el-form-item label="">
           <el-input
             v-model="sbPromptVideoText"
@@ -2587,11 +2576,6 @@
       </template>
     </el-dialog>
 
-    <!-- AI 配置弹窗（不跳转，避免本页内容丢失） -->
-    <el-dialog v-model="showAiConfigDialog" title="AI 配置" width="90%" destroy-on-close class="ai-config-dialog">
-      <AIConfigContent v-if="showAiConfigDialog" />
-    </el-dialog>
-
     <!-- 图片放大预览：点击遮罩或图片关闭 -->
     <Teleport to="body">
       <div
@@ -2610,8 +2594,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch, reactive, nextTick } 
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Setting, Plus, Minus, Sunny, Moon, MagicStick, Upload, Delete, Check, Loading, WarningFilled, User, Box, Picture, Film, VideoCamera, Document, InfoFilled, Refresh, ZoomIn, QuestionFilled, DocumentAdd, Expand, Fold, VideoPlay, Grid, Close } from '@element-plus/icons-vue'
-import { useTheme } from '@/composables/useTheme'
+import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Setting, Plus, Minus, MagicStick, Upload, Delete, Check, Loading, WarningFilled, User, Box, Picture, Film, VideoCamera, Document, InfoFilled, Refresh, ZoomIn, QuestionFilled, DocumentAdd, Expand, Fold, VideoPlay, VideoPause, Grid, Close } from '@element-plus/icons-vue'
 import { useFilmStore } from '@/stores/film'
 import { useGenerationTaskStore, GEN_RESOURCE } from '@/stores/generationTaskStore'
 import { syncGeneratingSetsFromStore, buildEpisodeContext, buildExtractTaskMeta, isEpisodeExtractRunning } from '@/composables/useGenerationTaskSync'
@@ -2633,7 +2616,6 @@ import { generationSettingsAPI } from '@/api/prompts'
 import { parseScriptIntoEpisodes, episodesListToPlainScript } from '@/utils/scriptEpisodes'
 import { exportStoryboardSheet } from '@/utils/exportStoryboardSheet'
 import StylePickerButton from '@/components/StylePickerButton.vue'
-import AIConfigContent from '@/components/AIConfigContent.vue'
 import UniversalSegmentOmniAtEditor from '@/components/UniversalSegmentOmniAtEditor.vue'
 import {
   generationStyleOptions,
@@ -2652,11 +2634,50 @@ const route = useRoute()
 const router = useRouter()
 const store = useFilmStore()
 const genStore = useGenerationTaskStore()
-const { isDark, toggle: toggleTheme } = useTheme()
 const { videoResolution: storeVideoResolution } = storeToRefs(store)
 
 // ── Composable: Navigation ─────────────────────────────
-const { navCollapsed, storyboardMenuExpanded, toggleNav, scrollToTop, scrollToAnchor } = useNavigation()
+const { navCollapsed, storyboardMenuExpanded, toggleNav: toggleNavState, scrollToTop, scrollToAnchor } = useNavigation()
+const quickNavRef = ref(null)
+const mainRef = ref(null)
+let quickNavAnimation = null
+let mainLayoutAnimation = null
+
+async function toggleNavAnimated() {
+  const sidebar = quickNavRef.value
+  const main = mainRef.value
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (!sidebar || !main || reduceMotion || typeof sidebar.animate !== 'function' || typeof main.animate !== 'function') {
+    toggleNavState()
+    return
+  }
+
+  // Capture the currently presented rectangles before cancelling. This makes
+  // rapid reversals retarget from the visible frame instead of restarting.
+  const sidebarFirst = sidebar.getBoundingClientRect()
+  const mainFirst = main.getBoundingClientRect()
+  quickNavAnimation?.cancel()
+  mainLayoutAnimation?.cancel()
+  toggleNavState()
+  await nextTick()
+  const sidebarLast = sidebar.getBoundingClientRect()
+  const mainLast = main.getBoundingClientRect()
+
+  const sidebarScale = sidebarLast.width ? sidebarFirst.width / sidebarLast.width : 1
+  quickNavAnimation = sidebar.animate([
+    { transform: `translateX(${sidebarFirst.left - sidebarLast.left}px) scaleX(${sidebarScale})`, opacity: .92 },
+    { transform: 'translateX(0) scaleX(1)', opacity: 1 },
+  ], { duration: 240, easing: 'cubic-bezier(0.32, 0.72, 0, 1)', fill: 'none' })
+  mainLayoutAnimation = main.animate([
+    { transform: `translateX(${mainFirst.left - mainLast.left}px)`, opacity: .94 },
+    { transform: 'translateX(0)', opacity: 1 },
+  ], { duration: 220, easing: 'cubic-bezier(0.23, 1, 0.32, 1)', fill: 'none' })
+}
+
+onBeforeUnmount(() => {
+  quickNavAnimation?.cancel()
+  mainLayoutAnimation?.cancel()
+})
 
 function goList() {
   router.push('/')
@@ -2669,10 +2690,10 @@ function goCanvasMode() {
 }
 
 
-const showAiConfigDialog = ref(false)
-watch(showAiConfigDialog, (open) => {
-  if (!open) invalidateActiveVideoAiConfigCache()
-})
+function openAiConfigPage() {
+  invalidateActiveVideoAiConfigCache()
+  router.push({ name: 'ai-config', query: { returnTo: route.fullPath } })
+}
 const storyInput = ref('')
 const storyStyle = ref('')
 const storyType = ref('')
@@ -8255,7 +8276,7 @@ html.light .film-create {
   z-index: 200;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.15), 0 4px 20px rgba(0, 0, 0, 0.2);
   margin-left: 180px;
-  transition: margin-left 0.25s cubic-bezier(.4,0,.2,1);
+  transition: opacity var(--motion-fast) var(--motion-ease-out);
 }
 .sidebar-collapsed .header {
   margin-left: 48px;
@@ -8274,39 +8295,32 @@ html.light .header {
   margin: 0;
   cursor: pointer;
   display: flex;
-  flex-direction: column;
-  gap: 1px;
   line-height: 1;
   transition: filter 0.3s;
+  flex: 0 0 auto;
+  overflow: visible;
+  padding-right: 6px;
 }
 .logo:hover { filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.5)); }
 .logo-main {
-  font-size: 1.05rem;
+  display: inline-block;
+  padding-right: 0.16em;
+  font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', 'Arial Narrow', sans-serif;
+  font-size: 1.4rem;
   font-weight: 700;
+  font-style: italic;
   background: linear-gradient(135deg, #d0d5e8 0%, #a8b0cc 50%, #8890b0 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.035em;
   filter: drop-shadow(0 0 8px rgba(160, 170, 200, 0.15));
-}
-.logo-sub {
-  font-size: 0.65rem;
-  font-weight: 400;
-  letter-spacing: 0.04em;
-  color: #52525e;
-  -webkit-text-fill-color: #52525e;
-  text-transform: uppercase;
 }
 html.light .logo-main {
   background: linear-gradient(135deg, #6d28d9, #4f46e5);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-}
-html.light .logo-sub {
-  color: #9ca3af;
-  -webkit-text-fill-color: #9ca3af;
 }
 .breadcrumb-sep {
   color: #3a3a44;
@@ -8353,7 +8367,7 @@ html.light .page-title {
   --el-button-hover-bg-color: rgba(255, 255, 255, 0.08);
   --el-button-hover-border-color: rgba(255, 255, 255, 0.18);
   --el-button-hover-text-color: #c8c8d0;
-  transition: all 0.2s ease;
+  transition: color var(--motion-fast) var(--motion-ease-out), background-color var(--motion-fast) var(--motion-ease-out), border-color var(--motion-fast) var(--motion-ease-out), box-shadow var(--motion-fast) var(--motion-ease-out), transform var(--motion-fast) var(--motion-ease-out);
 }
 html.light .btn-theme {
   --el-button-bg-color: rgba(99, 102, 241, 0.04);
@@ -8379,7 +8393,7 @@ html.light .btn-theme {
   width: 180px;
   overflow-y: auto;
   overflow-x: hidden;
-  transition: width 0.25s cubic-bezier(.4,0,.2,1), padding 0.25s cubic-bezier(.4,0,.2,1);
+  transition: opacity var(--motion-fast) var(--motion-ease-out), transform 240ms var(--motion-ease-drawer);
 }
 html.light .quick-nav {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 247, 255, 0.99) 100%);
@@ -8629,7 +8643,7 @@ html.light .step-line { background: rgba(0,0,0,0.1); }
   flex-shrink: 0;
   font-size: 11px;
   font-weight: 700;
-  transition: all 0.25s;
+  transition: color var(--motion-standard) var(--motion-ease-out), background-color var(--motion-standard) var(--motion-ease-out), border-color var(--motion-standard) var(--motion-ease-out), box-shadow var(--motion-standard) var(--motion-ease-out), transform var(--motion-standard) var(--motion-ease-out);
   border: 2px solid transparent;
 }
 .dot-pending {
@@ -8760,7 +8774,7 @@ html.light .nav-sub-item:hover { color: #1e1b4b; background: rgba(99,102,241,0.0
   margin-left: 180px;
   margin-right: 0;
   padding: 24px 32px 48px;
-  transition: margin-left 0.25s cubic-bezier(.4,0,.2,1);
+  transition: opacity var(--motion-fast) var(--motion-ease-out);
 }
 .sidebar-collapsed .main {
   margin-left: 48px;
@@ -9567,7 +9581,7 @@ html.light .segment-shot-range { color: #9ca3af; }
   overflow: hidden;
   position: relative;
   transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
-  animation: sb-fade-in 0.35s ease both;
+  animation: sb-fade-in var(--motion-standard) var(--motion-ease-out) both;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }
 .storyboard-row:hover {

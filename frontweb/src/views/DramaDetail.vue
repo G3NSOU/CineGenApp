@@ -1,30 +1,20 @@
 <template>
   <div class="drama-detail">
-    <header class="header">
-      <div class="header-inner">
-        <h1 class="logo" @click="router.push('/')">
-          <span class="logo-main">本地短剧助手</span>
-          <span class="logo-sub">LocalMiniDrama</span>
-        </h1>
+    <Teleport to="#app-header-context">
+      <div class="cgp-route-context" :key="`drama-${drama?.id || 'loading'}`">
+        <el-button text class="cgp-context-home" @click="router.push('/')">
+          <el-icon><ArrowLeft /></el-icon>项目
+        </el-button>
         <span class="breadcrumb-sep">›</span>
         <span class="page-title">{{ drama?.title || '剧集管理' }}</span>
-        <el-button class="btn-back-list" @click="router.push('/')">
-          <el-icon><ArrowLeft /></el-icon>返回列表
+        <el-button type="primary" @click="goCreate">
+          <el-icon><VideoPlay /></el-icon>进入制作
         </el-button>
-        <div class="header-actions">
-          <el-button class="btn-theme" :title="isDark ? '切换到浅色模式' : '切换到暗色模式'" @click="toggleTheme">
-            <el-icon><Sunny v-if="isDark" /><Moon v-else /></el-icon>
-            {{ isDark ? '浅色' : '暗色' }}
-          </el-button>
-          <el-button type="primary" @click="goCreate">
-            <el-icon><VideoPlay /></el-icon>进入制作
-          </el-button>
-          <el-button type="primary" plain @click="goCanvasMode">
-            <el-icon><Grid /></el-icon>画布模式
-          </el-button>
-        </div>
+        <el-button type="primary" plain @click="goCanvasMode">
+          <el-icon><Grid /></el-icon>画布模式
+        </el-button>
       </div>
-    </header>
+    </Teleport>
 
     <main class="main" v-loading="loading">
       <!-- 基本信息 + 设置 -->
@@ -563,9 +553,8 @@
 import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, VideoPlay, Plus, Delete, Sunny, Moon, PictureFilled, Grid } from '@element-plus/icons-vue'
+import { ArrowLeft, VideoPlay, Plus, Delete, PictureFilled, Grid } from '@element-plus/icons-vue'
 import EpisodeBatchImportDialog from '@/components/EpisodeBatchImportDialog.vue'
-import { useTheme } from '@/composables/useTheme'
 import { dramaAPI } from '@/api/drama'
 import { characterLibraryAPI } from '@/api/characterLibrary'
 import { sceneLibraryAPI } from '@/api/sceneLibrary'
@@ -579,7 +568,6 @@ import { propAPI } from '@/api/props'
 import { stylePromptMetadataForSave, backfillDramaStylePromptMetadataIfNeeded } from '@/constants/styleOptions'
 
 const route = useRoute()
-const { isDark, toggle: toggleTheme } = useTheme()
 const router = useRouter()
 const dramaId = Number(route.params.id)
 
@@ -1249,36 +1237,31 @@ html.light .drama-detail .header {
   margin: 0;
   cursor: pointer;
   display: flex;
-  flex-direction: column;
-  gap: 1px;
   line-height: 1;
   transition: filter 0.3s;
+  flex: 0 0 auto;
+  overflow: visible;
+  padding-right: 6px;
 }
 .logo:hover { filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.5)); }
 .logo-main {
-  font-size: 1.1rem;
+  display: inline-block;
+  padding-right: 0.16em;
+  font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', 'Arial Narrow', sans-serif;
+  font-size: 1.4rem;
   font-weight: 700;
+  font-style: italic;
+  letter-spacing: 0.035em;
   background: linear-gradient(135deg, #c4b5fd 0%, #818cf8 50%, #a78bfa 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-}
-.logo-sub {
-  font-size: 0.68rem;
-  font-weight: 400;
-  letter-spacing: 0.02em;
-  color: #6d6d7a;
-  -webkit-text-fill-color: #6d6d7a;
 }
 html.light .drama-detail .logo-main {
   background: linear-gradient(135deg, #7c3aed, #6366f1);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-}
-html.light .drama-detail .logo-sub {
-  color: #9ca3af;
-  -webkit-text-fill-color: #9ca3af;
 }
 .header-inner { max-width: min(1200px, 96vw); margin: 0 auto; display: flex; align-items: center; gap: 16px; }
 .breadcrumb-sep {
@@ -1528,7 +1511,7 @@ html.light .res-tab--drama.active::after { background: #7c3aed; }
   --el-button-hover-bg-color: rgba(148, 163, 184, 0.2);
   --el-button-hover-border-color: rgba(148, 163, 184, 0.5);
   --el-button-hover-text-color: #cbd5e1;
-  transition: all 0.2s;
+  transition: color var(--motion-fast) var(--motion-ease-out), background-color var(--motion-fast) var(--motion-ease-out), border-color var(--motion-fast) var(--motion-ease-out), box-shadow var(--motion-fast) var(--motion-ease-out), transform var(--motion-fast) var(--motion-ease-out);
 }
 html.light .btn-theme {
   --el-button-bg-color: rgba(99, 102, 241, 0.08);

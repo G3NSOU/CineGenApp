@@ -195,6 +195,7 @@ function ensureAllColumns(database) {
     { name: 'local_path',        type: 'TEXT' },
     { name: 'extra_images',      type: 'TEXT' },
     { name: 'voice_style',       type: 'TEXT' },
+    { name: 'voice_library_id',  type: 'INTEGER' },
     { name: 'sort_order',        type: 'INTEGER DEFAULT 0' },
     { name: 'error_msg',         type: 'TEXT' },
     { name: 'identity_anchors',  type: 'TEXT' },   // JSON: 6层视觉锚点（骨相/五官/辨识标记/色值/皮肤/发型）
@@ -210,6 +211,10 @@ function ensureAllColumns(database) {
     { name: 'created_at',        type: 'TEXT' },
     { name: 'updated_at',        type: 'TEXT' },
     { name: 'deleted_at',        type: 'TEXT' },
+  ]);
+
+  ensureColumns(database, 'character_libraries', [
+    { name: 'voice_library_id', type: 'INTEGER' },
   ]);
 
   // --- scenes ---
@@ -354,6 +359,10 @@ function ensureAllColumns(database) {
     { name: 'first_frame_url',      type: 'TEXT' },
     { name: 'last_frame_url',       type: 'TEXT' },
     { name: 'reference_image_urls', type: 'TEXT' },
+    { name: 'generation_mode', type: 'TEXT' },
+    { name: 'reference_assets', type: 'TEXT' },
+    { name: 'generation_config', type: 'TEXT' },
+    { name: 'voice_reference_url', type: 'TEXT' },
     { name: 'video_url',            type: 'TEXT' },
     { name: 'local_path',           type: 'TEXT' },
     { name: 'status',               type: 'TEXT' },
@@ -518,6 +527,20 @@ function ensureAllColumns(database) {
       updated_at TEXT NOT NULL DEFAULT ''
     )`);
   } catch (_) {}
+
+  // 素材同步到 TOS 后必须跨刷新、跨页面保存 URL 与七天有效期。
+  // 同时覆盖全局素材表和项目内素材表，保证自由创作引用同一套状态。
+  const tosColumns = [
+    { name: 'tos_url', type: 'TEXT' },
+    { name: 'tos_object_key', type: 'TEXT' },
+    { name: 'tos_synced_at', type: 'TEXT' },
+    { name: 'tos_expires_at', type: 'TEXT' },
+  ];
+  for (const table of [
+    'character_libraries', 'scene_libraries', 'prop_libraries', 'audio_libraries',
+    'characters', 'scenes', 'props',
+  ]) ensureColumns(database, table, tosColumns);
+  ensureColumns(database, 'character_libraries', [{ name: 'voice_library_id', type: 'INTEGER' }]);
 }
 
 /** 对已打开的 database 执行迁移与兜底补列（供 app 启动时调用） */
