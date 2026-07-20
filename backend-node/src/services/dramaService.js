@@ -4,6 +4,13 @@ const storageLayout = require('./storageLayout');
 const { resolveStylePreset } = require('../constants/generationStylePresets');
 const seedance2AssetGuards = require('../utils/seedance2AssetGuards');
 
+const WORKFLOW_MODES = new Set(['pipeline', 'free_studio']);
+
+function normalizeWorkflowMode(value) {
+  const mode = String(value || '').trim().toLowerCase();
+  return WORKFLOW_MODES.has(mode) ? mode : 'pipeline';
+}
+
 /**
  * 清理 image_url：如果数据库中存储的是 base64 data URL，则返回 null。
  * 图片应通过 local_path → /static/{local_path} 访问，base64 不应通过 API 透传（会严重膨胀响应体）。
@@ -37,6 +44,7 @@ function createDrama(db, log, req) {
       meta = {};
     }
   }
+  meta.workflow_mode = normalizeWorkflowMode(req.workflow_mode || meta.workflow_mode);
   if (!meta.storage_folder_label) {
     meta.storage_folder_label = storageLayout.sanitizeFolderLabel(req.title || '');
   }
@@ -300,6 +308,8 @@ function rowToDrama(r) {
       metadata = {};
     }
   }
+  metadata = metadata && typeof metadata === 'object' ? metadata : {};
+  metadata.workflow_mode = normalizeWorkflowMode(metadata.workflow_mode);
   return {
     id: r.id,
     title: r.title,
@@ -311,7 +321,8 @@ function rowToDrama(r) {
     status: r.status || 'draft',
     thumbnail: r.thumbnail,
     tags: r.tags,
-    metadata: metadata || {},
+    workflow_mode: metadata.workflow_mode,
+    metadata,
     created_at: r.created_at,
     updated_at: r.updated_at,
   };
@@ -375,7 +386,7 @@ function rowToStoryboard(r) {
       depth_of_field: r.depth_of_field ?? null,
       segment_index: r.segment_index ?? 0,
       segment_title: r.segment_title ?? null,
-      creation_mode: r.creation_mode === 'universal' ? 'universal' : 'classic',
+      creation_mode: ['classic', 'universal', 'custom_multi_reference'].includes(r.creation_mode) ? r.creation_mode : 'classic',
       universal_segment_text: r.universal_segment_text ?? null,
       first_frame_image_id: r.first_frame_image_id ?? null,
       last_frame_image_id: r.last_frame_image_id ?? null,
@@ -419,6 +430,11 @@ function rowToCharacter(r) {
     four_view_image_url: r.four_view_image_url || null,
     seedance2_asset: parseJsonColumn(r.seedance2_asset),
     seedance2_voice_asset: parseJsonColumn(r.seedance2_voice_asset),
+    voice_library_id: r.voice_library_id ?? null,
+    tos_url: r.tos_url || null,
+    tos_object_key: r.tos_object_key || null,
+    tos_synced_at: r.tos_synced_at || null,
+    tos_expires_at: r.tos_expires_at || null,
     created_at: r.created_at,
     updated_at: r.updated_at,
   };
@@ -440,6 +456,10 @@ function rowToScene(r) {
     ref_image: r.ref_image || null,
     status: r.status || 'pending',
     error_msg: r.error_msg,
+    tos_url: r.tos_url || null,
+    tos_object_key: r.tos_object_key || null,
+    tos_synced_at: r.tos_synced_at || null,
+    tos_expires_at: r.tos_expires_at || null,
     created_at: r.created_at,
     updated_at: r.updated_at,
   };
@@ -459,6 +479,10 @@ function rowToProp(r) {
     ref_image: r.ref_image || null,
     negative_prompt: r.negative_prompt || null,
     error_msg: r.error_msg,
+    tos_url: r.tos_url || null,
+    tos_object_key: r.tos_object_key || null,
+    tos_synced_at: r.tos_synced_at || null,
+    tos_expires_at: r.tos_expires_at || null,
     created_at: r.created_at,
     updated_at: r.updated_at,
   };
@@ -854,6 +878,7 @@ function downloadEpisodeVideo(db, episodeId) {
 }
 
 module.exports = {
+  normalizeWorkflowMode,
   createDrama,
   getDrama,
   getDramaById,

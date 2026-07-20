@@ -1,0 +1,390 @@
+/* CineGen low-resource material mode.
+   Geometry is intentionally absent from this file: it only changes paint,
+   compositing and motion cost, so every workflow keeps its current layout. */
+
+html.cinegen-simple {
+  --cgp-bg-deep: #090a0c;
+  --cgp-bg-base: #0d0f12;
+  --cgp-bg-elevated: #17191d;
+  --cgp-glass: #17191d;
+  --cgp-glass-strong: #1b1d21;
+  --cgp-glass-soft: #202226;
+  --cgp-border: #2b2d32;
+  --cgp-border-strong: #3a3d43;
+  --cgp-border-bright: #44474e;
+  --cgp-highlight: #33363b;
+  --cgp-accent-soft: #2a2c31;
+  --cgp-blur: 0px;
+  --cgp-shadow-sm: 0 3px 10px rgba(0,0,0,.2);
+  --cgp-shadow: 0 7px 20px rgba(0,0,0,.25);
+  --cgp-shadow-float: 0 12px 34px rgba(0,0,0,.38);
+
+  --ui-panel: #15171a;
+  --ui-panel-solid: #1b1d21;
+  --ui-panel-raised: #1b1d21;
+  --ui-panel-muted: #202226;
+  --ui-control-bg: #202226;
+  --ui-control-hover: #292b30;
+  --ui-divider: #292b30;
+  --ui-edge: #2d3035;
+  --ui-edge-hot: #42454c;
+  --ui-focus: #74777d;
+  --ui-accent-soft: #292b30;
+  --ui-shadow-panel: 0 4px 14px rgba(0,0,0,.2);
+  --ui-shadow-float: 0 12px 34px rgba(0,0,0,.38);
+
+  --liquid-frost-bg: #17191d;
+  --liquid-edge-bg: #1b1d21;
+  --liquid-edge-border: #2d3035;
+  --liquid-pulse-bg: #303238;
+  --liquid-pulse-glow: transparent;
+
+  --work-panel: #15171a;
+  --work-panel-raised: #1b1d21;
+  --work-panel-soft: #202226;
+  --work-border: #2b2d32;
+  --work-border-strong: #3a3d43;
+  --work-input: #101114;
+  --work-control: #202226;
+  --work-control-hover: #292b30;
+
+  --bg-page: #0d0f12;
+  --bg-card: #17191d;
+  --bg-inner: #202226;
+  --bg-hover: #292b30;
+  --border-color: #2b2d32;
+  --border-muted: #383b41;
+  --shadow: 0 3px 10px rgba(0,0,0,.2);
+
+  --el-bg-color: #191b1f;
+  --el-bg-color-page: #0d0f12;
+  --el-bg-color-overlay: #1d1f23;
+  --el-fill-color-blank: #191b1f;
+  --el-fill-color: #222429;
+  --el-fill-color-light: #202226;
+  --el-fill-color-lighter: #1d1f23;
+  --el-fill-color-extra-light: #1a1c20;
+  --el-fill-color-dark: #111216;
+  --el-fill-color-darker: #0c0d10;
+  --el-border-color: #303238;
+  --el-border-color-light: #292b30;
+  --el-border-color-lighter: #24262b;
+  --el-border-color-extra-light: #202226;
+  --el-mask-color: rgba(0,0,0,.72);
+}
+
+/* Remove GPU compositing effects globally in this opt-in mode. */
+html.cinegen-simple body *,
+html.cinegen-simple body *::before,
+html.cinegen-simple body *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.cinegen-simple body {
+  background: #0d0f12 !important;
+}
+
+html.dark.cinegen-simple body #app :is(
+  .app-top-header,
+  .materials-sidebar,
+  .quick-nav,
+  .card,
+  .section.card,
+  .project-card,
+  .action-card,
+  .episode-card,
+  .panel-surface,
+  .input-panel,
+  .result-panel,
+  .preview-panel,
+  .filter-bar,
+  .media-card,
+  .pipeline-panel,
+  .resource-block,
+  .storyboard-row,
+  .sb-card,
+  .sb-panel,
+  .library-item,
+  .drama-res-item,
+  .asset-card,
+  .media-asset-card,
+  .material-card,
+  .history-item,
+  .subproject-item,
+  .video-list-item,
+  .config-card,
+  .canvas-floating-toolbar,
+  .canvas-context-menu,
+  .canvas-panel,
+  .asset-panel,
+  .script-panel,
+  .media-panel
+),
+html.dark.cinegen-simple body :is(
+  .el-dialog,
+  .el-drawer,
+  .el-message-box,
+  .el-popover.el-popper,
+  .el-select__popper.el-popper,
+  .el-dropdown__popper.el-popper,
+  .el-picker__popper.el-popper,
+  .el-message,
+  .el-overlay,
+  .el-loading-mask
+) {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.cinegen-simple body :is(
+  .app-top-header,
+  .materials-sidebar,
+  .film-create .quick-nav,
+  .drama-canvas-page .canvas-sidebar,
+  .prompt-editor-page .left-sidebar,
+  .drama-detail > .header,
+  .film-create > .header,
+  .studio-page > .studio-header,
+  .drama-canvas-page > .header,
+  .ai-config > .header
+) {
+  border-color: #292b30 !important;
+  background: #17191d !important;
+  background-image: none !important;
+  box-shadow: 0 3px 12px rgba(0,0,0,.22) !important;
+}
+
+html.cinegen-simple body :is(
+  .card,
+  .section.card,
+  .project-card,
+  .action-card,
+  .episode-card,
+  .panel-surface,
+  .input-panel,
+  .result-panel,
+  .preview-panel,
+  .filter-bar,
+  .media-card,
+  .quick-nav,
+  .pipeline-panel,
+  .resource-block,
+  .storyboard-row,
+  .sb-card,
+  .sb-panel,
+  .library-item,
+  .drama-res-item,
+  .asset-card,
+  .media-asset-card,
+  .material-card,
+  .history-item,
+  .subproject-item,
+  .video-list-item,
+  .config-card,
+  .script-sub-block,
+  .script-preview-wrap,
+  .voice-binding-panel
+) {
+  border-color: #2b2d32 !important;
+  background: #17191d !important;
+  background-image: none !important;
+  box-shadow: 0 3px 10px rgba(0,0,0,.18) !important;
+}
+
+html.cinegen-simple body :is(
+  .episode-card,
+  .library-item,
+  .drama-res-item,
+  .storyboard-row,
+  .resource-block,
+  .asset-item,
+  .subproject-item,
+  .video-list-item,
+  .history-item,
+  .asset-card,
+  .media-asset-card,
+  .media-card,
+  .material-card
+):hover {
+  border-color: #3b3e44 !important;
+  background: #1c1e22 !important;
+  box-shadow: 0 6px 16px rgba(0,0,0,.22) !important;
+  transform: translateY(-1px) !important;
+}
+
+html.cinegen-simple body :is(
+  .subproject-item.active,
+  .video-list-item.active,
+  .media-card.selected,
+  .asset-card.is-active,
+  .drama-detail .res-tab.active,
+  .drama-canvas-page .sidebar-item.active
+) {
+  border-color: #4a4d54 !important;
+  background: #292b30 !important;
+  box-shadow: none !important;
+}
+
+html.cinegen-simple body .project-card::after,
+html.cinegen-simple body .project-card::before,
+html.cinegen-simple body .action-card::after,
+html.cinegen-simple body .episode-card::before,
+html.cinegen-simple body .section.card::before,
+html.cinegen-simple body .panel-surface::before,
+html.cinegen-simple body .app-top-header__nav-slider::after {
+  content: none !important;
+}
+
+html.cinegen-simple body .app-top-header__nav,
+html.cinegen-simple body .app-top-header__nav-slider {
+  border-color: #303238 !important;
+  background: #202226 !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+html.cinegen-simple body :is(
+  .el-dialog,
+  .el-drawer,
+  .el-message-box,
+  .el-popover.el-popper,
+  .el-select__popper.el-popper,
+  .el-dropdown__popper.el-popper,
+  .el-picker__popper.el-popper,
+  .el-message
+) {
+  border-color: #383b41 !important;
+  background: #1b1d21 !important;
+  background-image: none !important;
+  box-shadow: 0 12px 34px rgba(0,0,0,.38) !important;
+}
+
+html.cinegen-simple body .el-overlay { background: rgba(0,0,0,.66) !important; }
+html.cinegen-simple body .el-loading-mask { background: rgba(13,15,18,.82) !important; }
+
+html.cinegen-simple body :is(
+  .el-input__wrapper,
+  .el-select__wrapper,
+  .el-textarea__inner,
+  .el-input-number,
+  .el-date-editor,
+  .el-segmented,
+  .omni-at-editor
+) {
+  border-color: #2d3035 !important;
+  background: #101114 !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+html.cinegen-simple body :is(
+  .el-input__wrapper,
+  .el-select__wrapper,
+  .el-textarea__inner,
+  .el-input-number,
+  .el-date-editor,
+  .omni-at-editor
+):hover {
+  border-color: #41444b !important;
+  background: #131519 !important;
+}
+
+html.cinegen-simple body :is(
+  .el-input__wrapper.is-focus,
+  .el-select__wrapper.is-focused,
+  .el-textarea__inner:focus,
+  .el-input-number:focus-within,
+  .el-date-editor:focus-within,
+  .omni-at-editor:focus
+) {
+  border-color: #666a72 !important;
+  background: #15171a !important;
+  box-shadow: 0 0 0 2px #2b2d32 !important;
+}
+
+html.cinegen-simple body .el-button:not(.is-text):not(.is-link) {
+  border-color: #32353a !important;
+  background: #222429 !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+html.cinegen-simple body .el-button:not(.is-text):not(.is-link):hover:not(.is-disabled) {
+  border-color: #464950 !important;
+  background: #2a2c31 !important;
+  box-shadow: none !important;
+  transform: translateY(-1px);
+}
+
+html.cinegen-simple body .el-button--primary:not(.is-text):not(.is-link):not(.is-plain) {
+  color: #ededed !important;
+  border-color: #4a4d54 !important;
+  background: #35383e !important;
+}
+
+html.cinegen-simple body :is(.el-segmented__item-selected, .el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  color: #ededed !important;
+  border-color: #4a4d54 !important;
+  background: #303238 !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+html.cinegen-simple body :is(.el-card, .el-table) {
+  border-color: #2b2d32 !important;
+  background: #17191d !important;
+  box-shadow: none !important;
+}
+
+html.cinegen-simple body .el-table th.el-table__cell { background: #1d1f23 !important; }
+html.cinegen-simple body .el-table__body tr:hover > td.el-table__cell { background: #222429 !important; }
+html.cinegen-simple body .el-tag { background: #222429 !important; box-shadow: none !important; }
+
+html.cinegen-simple body :is(
+  .studio-layout > .panel-surface,
+  .studio-page .preview-stage,
+  .drama-canvas-page .vue-flow__pane,
+  .drama-canvas-page .vue-flow__node > div,
+  .canvas-floating-toolbar,
+  .canvas-context-menu,
+  .canvas-panel,
+  .asset-panel,
+  .script-panel,
+  .media-panel,
+  .global-ai-config-dialog .el-dialog,
+  #app .ai-config
+) {
+  background: #15171a !important;
+  background-image: none !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,.2) !important;
+}
+
+html.cinegen-simple body .studio-page .preview-stage { background: #08090b !important; }
+html.cinegen-simple body .film-list .project-grid { perspective: none !important; }
+
+/* Retain feedback, but use short compositor-friendly motion only. */
+html.cinegen-simple body :is(
+  .project-card,
+  .episode-card,
+  .media-card,
+  .asset-card,
+  .library-item,
+  .storyboard-row,
+  .subproject-item,
+  .video-list-item,
+  .el-button,
+  .app-top-header__nav-slider,
+  .el-tabs__item
+) {
+  transition-duration: 120ms !important;
+  transition-timing-function: ease-out !important;
+}
+
+html.cinegen-simple body :is(.sb-generated-img, .library-item-cover img, .asset-cover img, .media-card img) {
+  transition: opacity 120ms ease-out !important;
+}
+
+html.cinegen-simple body :is(.library-item-cover:hover img, .asset-cover:hover img, .media-card:hover img) {
+  transform: none !important;
+}

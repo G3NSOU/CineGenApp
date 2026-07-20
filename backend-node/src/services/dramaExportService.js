@@ -277,7 +277,7 @@ function exportDrama(db, cfg, log, dramaId) {
             segment_index: sb.segment_index ?? 0,
             segment_title: sb.segment_title || null,
             continuity_snapshot: sb.continuity_snapshot || null,
-            creation_mode: sb.creation_mode === 'universal' ? 'universal' : 'classic',
+            creation_mode: ['classic', 'universal', 'custom_multi_reference'].includes(sb.creation_mode) ? sb.creation_mode : 'classic',
             universal_segment_text: sb.universal_segment_text || null,
             layout_description: sb.layout_description || null,
             // 用 original_id 记录首尾帧绑定的 image_generations 旧ID，导入时映射回新ID

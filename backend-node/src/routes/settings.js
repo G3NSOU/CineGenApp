@@ -2,6 +2,25 @@ const settingsService = require('../services/settingsService');
 const response = require('../response');
 const { loadConfig } = require('../config');
 const { resolveVideoGenerationTimeoutMinutes } = require('../config/videoGeneration');
+const tosStorageService = require('../services/tosStorageService');
+
+function tosErrorMessage(error) {
+  const requestId = String(error?.requestId || '').trim();
+  const suffix = requestId ? `（Request ID: ${requestId}）` : '';
+  if (error?.ec === '0002-00000020') {
+    return `AccessKey ID 不存在。请使用火山引擎 IAM“访问控制 → 密钥管理”中创建的 AccessKey ID，不要填写方舟 API Key 或其他 Key ID ${suffix}`.trim();
+  }
+  const message = String(error?.message || '').trim();
+  if (message) return `${message}${suffix}`;
+  const code = String(error?.code || '').trim();
+  if (code === 'ECONNABORTED' || code === 'ETIMEDOUT') {
+    return `TOS HTTPS 直连超时，请检查当前网络是否允许直连该 Endpoint ${suffix}`.trim();
+  }
+  if (error?.statusCode === 403) {
+    return `TOS 拒绝了请求（HTTP 403），请检查 AccessKey/Secret Access Key 是否成对、账号是否有 Bucket 权限 ${suffix}`.trim();
+  }
+  return `${code || 'TOS 未返回可识别的错误信息'}${suffix}`;
+}
 
 function getLanguage(cfg) {
   return (req, res) => {
@@ -62,11 +81,53 @@ function updateGenerationSettings(db) {
   };
 }
 
+function getTosStorageSettings(cfg) {
+  return (_req, res) => response.success(res, tosStorageService.publicTosConfig(cfg));
+}
+
+function updateTosStorageSettings(cfg, log) {
+  return (req, res) => {
+    try {
+      const current = tosStorageService.normalizeTosConfig(cfg?.tos_storage || {});
+      const next = tosStorageService.normalizeTosConfig(req.body || {}, current);
+      const result = settingsService.updateTosStorageConfig(cfg, log, next);
+      if (!result.ok) return response.badRequest(res, result.error);
+      response.success(res, tosStorageService.publicTosConfig(cfg));
+    } catch (error) {
+      response.badRequest(res, error.message);
+    }
+  };
+}
+
+function testTosStorageSettings(cfg) {
+  let inFlight = null;
+  return async (req, res) => {
+    if (inFlight) {
+      return response.badRequest(res, 'TOS 连接测试正在进行，请等待当前请求完成');
+    }
+    try {
+      const current = tosStorageService.resolveTosConfig(cfg).config;
+      const candidate = tosStorageService.normalizeTosConfig(req.body || {}, current);
+      inFlight = tosStorageService.testTosConnection(candidate);
+      response.success(res, await inFlight);
+    } catch (error) {
+      response.badRequest(res, `TOS 连接失败：${tosErrorMessage(error)}`);
+    } finally {
+      inFlight = null;
+    }
+  };
+}
+
 module.exports = function settingsRoutes(db, cfg, log) {
   return {
     getLanguage: getLanguage(cfg),
     updateLanguage: updateLanguage(cfg, log),
     getGenerationSettings: getGenerationSettings(db),
     updateGenerationSettings: updateGenerationSettings(db),
+    getTosStorageSettings: getTosStorageSettings(cfg),
+    updateTosStorageSettings: updateTosStorageSettings(cfg, log),
+    testTosStorageSettings: testTosStorageSettings(cfg),
   };
 };
+
+module.exports.tosErrorMessage = tosErrorMessage;

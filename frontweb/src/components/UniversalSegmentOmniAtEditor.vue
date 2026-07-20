@@ -3,7 +3,9 @@
     <div
       ref="editorRef"
       class="omni-at-editor"
-      contenteditable="true"
+      :contenteditable="disabled ? 'false' : 'true'"
+      :aria-disabled="disabled ? 'true' : 'false'"
+      :class="{ 'is-disabled': disabled }"
       spellcheck="false"
       data-placeholder="输入 @ 选择素材；编辑区显示 @场景名 / @角色名，保存与提交仍为 @图片N"
       @input="onInput"
@@ -28,6 +30,9 @@
           type="button"
           class="omni-at-menu-item"
           role="option"
+          :class="{ 'is-active': activeOption === s.index }"
+          :aria-selected="activeOption === s.index ? 'true' : 'false'"
+          @mouseenter="activeOption = s.index"
           @click="onPickSlot(s.index)"
         >
           <span class="omni-at-menu-thumb-wrap">
@@ -45,7 +50,7 @@
     </teleport>
     <div class="omni-at-footer">
       <el-tooltip content="复制为 @图片N 格式（与提交视频一致）" placement="top">
-        <el-button type="default" text size="small" class="omni-at-copy-btn" @click="onCopyCanonical">
+        <el-button type="default" text size="small" class="omni-at-copy-btn" :disabled="disabled" @click="onCopyCanonical">
           <el-icon><DocumentCopy /></el-icon>
           复制提示词
         </el-button>
@@ -61,6 +66,7 @@ import { DocumentCopy } from '@element-plus/icons-vue'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
+  disabled: { type: Boolean, default: false },
   /** { index: number, kind: 'scene'|'character'|'prop', name: string, thumbUrl: string }[] */
   slots: { type: Array, default: () => [] },
 })
@@ -72,6 +78,7 @@ const editorRef = ref(null)
 const menuOpen = ref(false)
 const menuStyle = ref({ top: '0px', left: '0px' })
 const composing = ref(false)
+const activeOption = ref(0)
 
 /** 'insert' at lone @ | 'replace' chip */
 let menuMode = 'insert'
@@ -281,8 +288,18 @@ function closeMenu() {
   replaceChipEl = null
 }
 
+function firstSlotIndex() {
+  return Number(props.slots?.[0]?.index) || 0
+}
+
+function openMenu() {
+  if (props.disabled) return
+  activeOption.value = firstSlotIndex()
+  menuOpen.value = true
+}
+
 function maybeOpenAtMenu() {
-  if (composing.value) return
+  if (props.disabled || composing.value) return
   const el = editorRef.value
   if (!el) return
   const s = serializeEditor(el)
@@ -296,11 +313,12 @@ function maybeOpenAtMenu() {
   replaceChipEl = null
   nextTick(() => {
     positionMenuAtCaret()
-    menuOpen.value = true
+    openMenu()
   })
 }
 
 function onInput() {
+  if (props.disabled) return
   const el = editorRef.value
   if (!el) return
   const next = serializeEditor(el)
@@ -317,6 +335,10 @@ function onBlur(e) {
 }
 
 function onKeydown(e) {
+  if (props.disabled) {
+    e.preventDefault()
+    return
+  }
   if (e.key === 'Escape' && menuOpen.value) {
     e.preventDefault()
     closeMenu()
@@ -324,10 +346,21 @@ function onKeydown(e) {
   }
   if (menuOpen.value && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
     e.preventDefault()
+    const indexes = (props.slots || []).map((slot) => Number(slot.index)).filter(Boolean)
+    if (!indexes.length) return
+    const current = Math.max(0, indexes.indexOf(activeOption.value))
+    const delta = e.key === 'ArrowDown' ? 1 : -1
+    activeOption.value = indexes[(current + delta + indexes.length) % indexes.length]
+    return
+  }
+  if (menuOpen.value && e.key === 'Enter' && activeOption.value) {
+    e.preventDefault()
+    onPickSlot(activeOption.value)
   }
 }
 
 function onPaste(e) {
+  if (props.disabled) return
   e.preventDefault()
   const text = e.clipboardData?.getData('text/plain') ?? ''
   try {
@@ -350,6 +383,7 @@ function onChipMouseDown(e) {
 }
 
 function onChipClick(e) {
+  if (props.disabled) return
   const chip = e.currentTarget
   if (!(chip instanceof HTMLElement) || !chip.classList.contains(CHIP_CLASS)) return
   e.preventDefault()
@@ -359,10 +393,11 @@ function onChipClick(e) {
   replaceChipEl = chip
   const r = chip.getBoundingClientRect()
   positionMenuNearRect(r)
-  menuOpen.value = true
+  openMenu()
 }
 
 function onPickSlot(index) {
+  if (props.disabled) return
   const el = editorRef.value
   if (!el) return
   if (menuMode === 'replace' && replaceChipEl) {
@@ -490,13 +525,10 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 .omni-at-copy-btn {
-  color: #a78bfa !important;
+  color: rgba(232, 234, 236, 0.72) !important;
 }
 .omni-at-copy-btn:hover {
-  color: #c4b5fd !important;
-}
-html.light .omni-at-copy-btn {
-  color: #6d28d9 !important;
+  color: rgba(246, 247, 248, 0.94) !important;
 }
 .omni-at-editor {
   flex: 1;
@@ -506,21 +538,22 @@ html.light .omni-at-copy-btn {
   padding: 8px 11px;
   font-size: 13px;
   line-height: 1.55;
-  color: #e5e7eb;
-  background: var(--omni-editor-bg, #141414);
-  border: 1px solid #4c4d4f;
-  border-radius: 4px;
+  color: rgba(242, 243, 244, 0.9);
+  background: rgba(18, 19, 20, 0.28);
+  border: 1px solid rgba(236, 238, 240, 0.13);
+  border-radius: 12px;
+  backdrop-filter: blur(12px) saturate(108%);
   outline: none;
   white-space: pre-wrap;
   word-break: break-word;
 }
 .omni-at-editor:focus {
-  border-color: #a78bfa;
-  box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.25) inset;
+  border-color: rgba(244, 245, 246, 0.34);
+  box-shadow: 0 0 0 1px rgba(244, 245, 246, 0.08) inset;
 }
 .omni-at-editor:empty::before {
   content: attr(data-placeholder);
-  color: #6b7280;
+  color: rgba(218, 220, 222, 0.42);
   pointer-events: none;
 }
 :deep(.omni-at-chip) {
@@ -529,35 +562,22 @@ html.light .omni-at-copy-btn {
   vertical-align: baseline;
   margin: 0 1px;
   padding: 0 5px;
-  border-radius: 4px;
+  border-radius: 6px;
   font-weight: 600;
-  color: #c4b5fd;
-  background: rgba(139, 92, 246, 0.22);
-  border: 1px solid rgba(167, 139, 250, 0.45);
+  color: rgba(246, 247, 248, 0.94);
+  background: rgba(230, 232, 234, 0.13);
+  border: 1px solid rgba(242, 244, 246, 0.22);
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
 }
 :deep(.omni-at-chip:hover) {
-  background: rgba(139, 92, 246, 0.38);
-  border-color: #a78bfa;
+  background: rgba(236, 238, 240, 0.2);
+  border-color: rgba(248, 249, 250, 0.4);
 }
-html.light .omni-at-editor {
-  color: #1f2937;
-  background: var(--el-fill-color-blank, #fff);
-  border-color: var(--el-border-color, #dcdfe6);
-}
-html.light .omni-at-editor:focus {
-  border-color: #7c3aed;
-  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.2) inset;
-}
-html.light :deep(.omni-at-chip) {
-  color: #5b21b6;
-  background: rgba(124, 58, 237, 0.12);
-  border-color: rgba(124, 58, 237, 0.35);
-}
-html.light :deep(.omni-at-chip:hover) {
-  background: rgba(124, 58, 237, 0.2);
+.omni-at-editor.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
 }
 </style>
 
@@ -567,25 +587,18 @@ html.light :deep(.omni-at-chip:hover) {
   z-index: 5000;
   overflow-y: auto;
   padding: 8px;
-  border-radius: 8px;
-  background: #1e293b;
-  border: 1px solid rgba(248, 250, 252, 0.18);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-}
-html.light .omni-at-menu {
-  background: #fff;
-  border-color: #e2e8f0;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  border-radius: 14px;
+  background: rgba(22, 23, 24, 0.84);
+  border: 1px solid rgba(242, 244, 246, 0.16);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(22px) saturate(112%);
 }
 .omni-at-menu-empty {
   font-size: 12px;
-  color: #94a3b8;
+  color: rgba(218, 220, 222, 0.62);
   padding: 8px 6px;
   max-width: 260px;
   line-height: 1.45;
-}
-html.light .omni-at-menu-empty {
-  color: #64748b;
 }
 .omni-at-menu-item {
   display: flex;
@@ -597,21 +610,17 @@ html.light .omni-at-menu-empty {
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: #f1f5f9;
+  color: rgba(242, 243, 244, 0.92);
   cursor: pointer;
   text-align: left;
 }
 .omni-at-menu-item:last-child {
   margin-bottom: 0;
 }
-.omni-at-menu-item:hover {
-  background: rgba(148, 163, 184, 0.15);
-}
-html.light .omni-at-menu-item {
-  color: #0f172a;
-}
-html.light .omni-at-menu-item:hover {
-  background: #f1f5f9;
+.omni-at-menu-item:hover,
+.omni-at-menu-item.is-active {
+  background: rgba(236, 238, 240, 0.11);
+  box-shadow: inset 0 0 0 1px rgba(244, 246, 248, 0.08);
 }
 .omni-at-menu-thumb-wrap {
   flex-shrink: 0;
@@ -619,12 +628,8 @@ html.light .omni-at-menu-item:hover {
   height: 44px;
   border-radius: 6px;
   overflow: hidden;
-  background: #0f172a;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-}
-html.light .omni-at-menu-thumb-wrap {
-  background: #f8fafc;
-  border-color: #e2e8f0;
+  background: rgba(8, 9, 10, 0.62);
+  border: 1px solid rgba(232, 234, 236, 0.18);
 }
 .omni-at-menu-thumb {
   width: 100%;
@@ -640,7 +645,7 @@ html.light .omni-at-menu-thumb-wrap {
   height: 100%;
   font-size: 16px;
   font-weight: 600;
-  color: #64748b;
+  color: rgba(214, 216, 218, 0.48);
 }
 .omni-at-menu-meta {
   display: flex;
@@ -656,62 +661,28 @@ html.light .omni-at-menu-thumb-wrap {
   width: fit-content;
   padding: 1px 5px;
   border-radius: 3px;
-  background: rgba(148, 163, 184, 0.2);
-  color: #cbd5e1;
+  background: rgba(232, 234, 236, 0.12);
+  color: rgba(230, 232, 234, 0.78);
 }
-.omni-at-menu-tag--scene {
-  background: rgba(34, 197, 94, 0.2);
-  color: #86efac;
-}
-.omni-at-menu-tag--character {
-  background: rgba(59, 130, 246, 0.2);
-  color: #93c5fd;
-}
-.omni-at-menu-tag--prop {
-  background: rgba(245, 158, 11, 0.2);
-  color: #fcd34d;
-}
-html.light .omni-at-menu-tag {
-  color: #475569;
-  background: #e2e8f0;
-}
-html.light .omni-at-menu-tag--scene {
-  color: #166534;
-  background: #dcfce7;
-}
-html.light .omni-at-menu-tag--character {
-  color: #1e40af;
-  background: #dbeafe;
-}
-html.light .omni-at-menu-tag--prop {
-  color: #92400e;
-  background: #fef3c7;
-}
+.omni-at-menu-tag--scene { background: rgba(236, 238, 240, 0.1); }
+.omni-at-menu-tag--character { background: rgba(236, 238, 240, 0.16); }
+.omni-at-menu-tag--prop { background: rgba(236, 238, 240, 0.22); }
 .omni-at-menu-name {
   font-size: 12px;
   font-weight: 500;
-  color: #e2e8f0;
+  color: rgba(236, 238, 240, 0.88);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-html.light .omni-at-menu-name {
-  color: #334155;
-}
 .omni-at-menu-at {
   font-size: 11px;
   font-family: ui-monospace, monospace;
-  color: #a78bfa;
+  color: rgba(245, 246, 247, 0.88);
 }
 .omni-at-menu-at-sub {
   font-size: 10px;
   font-family: ui-monospace, monospace;
-  color: #94a3b8;
-}
-html.light .omni-at-menu-at {
-  color: #6d28d9;
-}
-html.light .omni-at-menu-at-sub {
-  color: #64748b;
+  color: rgba(214, 216, 218, 0.56);
 }
 </style>

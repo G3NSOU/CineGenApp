@@ -1,12 +1,15 @@
 {
-  "appId": "com.localminidrama.desktop",
-  "productName": "LocalMiniDrama",
+  "appId": "com.cinegen.platform",
+  "productName": "CineGen",
   "directories": {
     "output": "release"
   },
   "files": [
     "main.js",
+    "preload.js",
     "package.json",
+    "assets/cinegen-trayTemplate.png",
+    "assets/cinegen-trayTemplate@2x.png",
     "backend-app/**/*",
     "node_modules/**/*"
   ],
@@ -21,26 +24,21 @@
       "filter": ["**/*"]
     },
     {
-      "from": "../example_drama",
-      "to": "example_drama",
-      "filter": ["**/*"]
-    },
-    {
-      "from": "ffmpeg-mac",
+      "from": "vendor/darwin-arm64",
       "to": "ffmpeg",
-      "filter": ["**/*"]
+      "filter": ["ffmpeg", "ffprobe", "LICENSE*"]
     }
   ],
   "mac": {
     "target": [
-      { "target": "dmg", "arch": ["x64", "arm64"] }
+      { "target": "dmg", "arch": ["arm64"] }
     ],
     "category": "public.app-category.entertainment",
-    "icon": null,
+    "icon": "assets/cinegen.icns",
     "identity": null
   },
   "dmg": {
     "title": "${productName} ${version}",
-    "artifactName": "${productName}-${version}-mac-${arch}.dmg"
+    "artifactName": "CineGen-${version}-mac-arm64.dmg"
   }
 }

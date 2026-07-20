@@ -2,8 +2,9 @@
 const fs = require('fs');
 const path = require('path');
 const aiConfigService = require('./aiConfigService');
+const { appendSearchParams, replaceTaskId, resolveEndpointUrl } = require('./endpointUrl');
 let sharp; try { sharp = require('sharp'); } catch (_) { sharp = null; }
-const { uploadLocalImageToProxy, uploadToImageProxy } = require('./uploadService');
+const { uploadLocalImageToProxy, uploadToImageProxy, resolveStorageFilePath } = require('./uploadService');
 const imageClient = require('./imageClient');
 const {
   clampToGeminiImageAspectRatio,
@@ -48,7 +49,7 @@ function resolveVideoProtocol(config, modelHint) {
   if (!explicit && protocol === 'openai') {
     if (/api\.x\.ai(\/|$)/.test(baseLower)) protocol = 'xai';
     else if (/grok-imagine|grok.*video/.test(modelLower)) protocol = 'xai';
-    else if (p === 'agnes' || /agnes-video|apihub\.agnes-ai\.com/i.test(baseLower)) protocol = 'agnes';
+    else if (provider === 'agnes' || /agnes-video|apihub\.agnes-ai\.com/i.test(baseLower)) protocol = 'agnes';
   }
   return protocol;
 }
@@ -295,23 +296,18 @@ function resolveImageInputForOmniLocalBase64(rawUrl, files_base_url, storage_loc
   const raw = (rawUrl || '').trim();
   if (!raw) return null;
   if (raw.startsWith('data:')) return raw;
-  if (/localhost|127\.0\.0\.1/i.test(raw) && storage_local_path) {
-    const baseUrl = (files_base_url || '').replace(/\/$/, '');
-    const afterStatic = raw.split('/static/')[1] || (baseUrl ? raw.replace(baseUrl + '/', '').replace(baseUrl, '') : null);
-    const relPath = afterStatic ? afterStatic.replace(/^\//, '') : null;
-    if (relPath) {
-      const filePath = path.join(storage_local_path, relPath);
-      try {
-        if (fs.existsSync(filePath)) {
-          const buf = fs.readFileSync(filePath);
-          const ext = path.extname(filePath).toLowerCase();
-          const mime = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' }[ext] || 'image/jpeg';
-          log.info('[KlingOmni] 图床失败兜底 → base64', { file: filePath, video_gen_id });
-          return 'data:' + mime + ';base64,' + buf.toString('base64');
-        }
-      } catch (e) {
-        log.warn('[KlingOmni] 读本地图失败', { error: e.message, video_gen_id });
+  if (storage_local_path) {
+    const resolved = resolveStorageFilePath(storage_local_path, raw);
+    try {
+      if (resolved && fs.existsSync(resolved.filePath)) {
+        const buf = fs.readFileSync(resolved.filePath);
+        const ext = path.extname(resolved.filePath).toLowerCase();
+        const mime = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' }[ext] || 'image/jpeg';
+        log.info('[KlingOmni] 图床失败兜底 → base64', { file: resolved.filePath, video_gen_id });
+        return 'data:' + mime + ';base64,' + buf.toString('base64');
       }
+    } catch (e) {
+      log.warn('[KlingOmni] 读本地图失败', { error: e.message, video_gen_id });
     }
   }
   return raw;
@@ -515,6 +511,46 @@ function normalizeVolcOmniDuration(modelName, durationNum) {
   return normalizeVolcengineDuration(modelName, durationNum);
 }
 
+function normalizeOfficialMediaPrompt(prompt, audioReferences = []) {
+  let text = String(prompt || '').trim()
+    .replace(/@图片(\d+)/g, '图片$1')
+    .replace(/@音频(\d+)/g, '音频$1');
+  const bindings = audioReferences
+    .map((audio, index) => ({ image: Number(audio.after_image_order), audio: index + 1 }))
+    .filter((item) => item.image > 0);
+  if (bindings.length) {
+    const relation = bindings.map((item) => `图片${item.image}中的角色使用音频${item.audio}的声线参考`).join('；');
+    if (!text.includes(relation)) text = `${text}${text ? '\n' : ''}声音参考关系：${relation}。`;
+  }
+  return text;
+}
+
+function buildVolcengineOmniRequestBody({
+  model, prompt, imageUrls = [], audioReferences = [], ratio = '16:9', duration = 5,
+  resolution, seed, cameraFixed, webSearch = false,
+}) {
+  const orderedAudio = audioReferences.slice().sort((a, b) => Number(a.original_index) - Number(b.original_index));
+  const body = {
+    model,
+    content: [
+      { type: 'text', text: normalizeOfficialMediaPrompt(prompt, orderedAudio) },
+      ...imageUrls.map((url) => ({ type: 'image_url', image_url: { url }, role: 'reference_image' })),
+      ...orderedAudio.map((audio) => ({ type: 'audio_url', audio_url: { url: audio.url }, role: 'reference_audio' })),
+    ],
+    ratio,
+    duration,
+    // CineGen 产品规则：生成视频始终无水印。
+    watermark: false,
+  };
+  // CineGen 的 Seedance 2 工作流始终生成声音；不接受前端或配置关闭。
+  body.generate_audio = true;
+  if (webSearch === true) body.tools = [{ type: 'web_search' }];
+  if (resolution) body.resolution = resolution;
+  if (seed != null) body.seed = Number(seed);
+  if (cameraFixed != null) body.camera_fixed = Boolean(cameraFixed);
+  return body;
+}
+
 /**
  * 火山引擎方舟 — Seedance 2.0 等「全能/多参考图」视频
  * 与标准 volcengine 共用：POST {base}/contents/generations/tasks，GET {base}/contents/generations/tasks/{id}
@@ -536,6 +572,8 @@ async function callVolcengineOmniVideoApi(config, log, opts) {
     storage_local_path,
     video_gen_id,
     voice_reference_url,   // Seedance 2.0 音色参考（全能模式专用）
+    audio_references,
+    web_search,
   } = opts;
 
   const url = buildVideoUrl(config, { defaultEndpoint: '/v1/videos/generations' });
@@ -544,23 +582,34 @@ async function callVolcengineOmniVideoApi(config, log, opts) {
   const ratio = aspect_ratio || '16:9';
   const effectiveDuration = normalizeVolcOmniDuration(finalModel, duration);
 
-  const refList = Array.isArray(reference_urls) ? reference_urls.filter(Boolean) : [];
+  const refList = Array.isArray(reference_urls) ? reference_urls.slice() : [];
   const primary = (image_url || '').trim();
   const orderedUrls = [...(primary ? [primary] : []), ...refList.filter((u) => u !== primary)];
   const maxRef = 9;
   const urls = orderedUrls.slice(0, maxRef);
 
-  const body = {
-    model: finalModel,
-    content: [{ type: 'text', text: (prompt || '').trim() }],
-    ratio,
-    duration: effectiveDuration,
-    watermark: watermark != null ? Boolean(watermark) : false,
-  };
-  if (resolution) body.resolution = resolution;
-  if (seed != null) body.seed = Number(seed);
-  if (camera_fixed != null) body.camera_fixed = Boolean(camera_fixed);
+  const resolvedImageUrls = [];
+  const resolvedAudioReferences = [];
 
+  async function resolveAudioReference(audio, index) {
+    let audioUrl = String(audio?.url || '').trim();
+    if (!audioUrl) return null;
+    if (storage_local_path) {
+      const resolved = resolveStorageFilePath(storage_local_path, audioUrl);
+      try {
+        if (resolved && fs.existsSync(resolved.filePath)) {
+          const buf = fs.readFileSync(resolved.filePath);
+          const ext = path.extname(resolved.filePath).toLowerCase();
+          const mime = { '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.webm': 'audio/webm' }[ext] || 'audio/mpeg';
+          audioUrl = `data:${mime};base64,${buf.toString('base64')}`;
+        }
+      } catch (_) {}
+    }
+    log.info('[VolcOmni] 已注入音频参考', { video_gen_id, index, type: audio?.type || 'audio' });
+    return { ...audio, url: audioUrl, original_index: index };
+  }
+
+  const explicitAudio = Array.isArray(audio_references) ? audio_references.slice(0, 3) : null;
   if (urls.length) {
     for (let i = 0; i < urls.length; i++) {
       let u = await resolveVolcOmniImageAsync(
@@ -571,66 +620,62 @@ async function callVolcengineOmniVideoApi(config, log, opts) {
         video_gen_id,
         i
       );
-      if (!u) continue;
-      if (/localhost|127\.0\.0\.1/i.test(u) && storage_local_path && (files_base_url || '').match(/localhost|127\.0\.0\.1/i)) {
-        const baseUrl = (files_base_url || '').replace(/\/$/, '');
-        const afterStatic = u.split('/static/')[1] || (baseUrl ? u.replace(baseUrl + '/', '').replace(baseUrl, '') : null);
-        const relPath = afterStatic ? afterStatic.replace(/^\//, '') : null;
-        if (relPath) {
-          const filePath = path.join(storage_local_path, relPath);
-          try {
-            if (fs.existsSync(filePath)) {
-              const buf = fs.readFileSync(filePath);
-              const ext = path.extname(filePath).toLowerCase();
-              const mime =
-                { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.bmp': 'image/bmp' }[
-                  ext
-                ] || 'image/png';
-              u = 'data:' + mime + ';base64,' + buf.toString('base64');
-            }
-          } catch (_) {}
+      if (!u) {
+        return {
+          error: `参考图片${i + 1}无法解析或上传，已中止任务以避免 @图片序号错位`,
+        };
+      }
+      resolvedImageUrls.push(u);
+      if (explicitAudio) {
+        const paired = explicitAudio.filter((audio) => Number(audio.after_image_order) === i + 1);
+        for (const audio of paired) {
+          const resolved = await resolveAudioReference(audio, explicitAudio.indexOf(audio));
+          if (resolved) resolvedAudioReferences.push(resolved);
         }
       }
-      const part = {
-        type: 'image_url',
-        image_url: { url: u },
-        role: 'reference_image',
-      };
-      body.content.push(part);
     }
-    if (body.content.length > 1) body.task_type = 'i2v';
   }
 
   // Seedance 2.0 音色参考：本路径仅 volcengine_omni 调用；有 URL 即注入（网关别名如 mingiz-sd2 也要生效）
-  if (opts.voice_reference_url) {
+  if (explicitAudio) {
+    const standalone = explicitAudio.filter((audio) => !Number(audio.after_image_order));
+    for (const audio of standalone) {
+      const resolved = await resolveAudioReference(audio, explicitAudio.indexOf(audio));
+      if (resolved) resolvedAudioReferences.push(resolved);
+    }
+  } else if (opts.voice_reference_url) {
     let voiceUrl = String(opts.voice_reference_url).trim();
     if (voiceUrl) {
       // 复用图片的本地文件转 base64 逻辑
-      if (/localhost|127\.0\.0\.1/i.test(voiceUrl) && storage_local_path && (files_base_url || '').match(/localhost|127\.0\.0\.1/i)) {
-        const baseUrl = (files_base_url || '').replace(/\/$/, '');
-        const afterStatic = voiceUrl.split('/static/')[1] || (baseUrl ? voiceUrl.replace(baseUrl + '/', '').replace(baseUrl, '') : null);
-        const relPath = afterStatic ? afterStatic.replace(/^\//, '') : null;
-        if (relPath) {
-          const filePath = path.join(storage_local_path, relPath);
-          try {
-            if (fs.existsSync(filePath)) {
-              const buf = fs.readFileSync(filePath);
-              const ext = path.extname(filePath).toLowerCase();
-              const mime =
-                { '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg' }[ext] || 'audio/mpeg';
-              voiceUrl = 'data:' + mime + ';base64,' + buf.toString('base64');
-            }
-          } catch (_) {}
-        }
+      if (storage_local_path) {
+        const resolved = resolveStorageFilePath(storage_local_path, voiceUrl);
+        try {
+          if (resolved && fs.existsSync(resolved.filePath)) {
+            const buf = fs.readFileSync(resolved.filePath);
+            const ext = path.extname(resolved.filePath).toLowerCase();
+            const mime =
+              { '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg' }[ext] || 'audio/mpeg';
+            voiceUrl = 'data:' + mime + ';base64,' + buf.toString('base64');
+          }
+        } catch (_) {}
       }
-      body.content.push({
-        type: 'audio_url',
-        audio_url: { url: voiceUrl },
-        role: 'reference_audio',
-      });
+      resolvedAudioReferences.push({ url: voiceUrl, original_index: 0 });
       log.info('[VolcOmni] 已注入 Seedance 2.0 音色参考音频', { video_gen_id, voice_ref: String(opts.voice_reference_url).slice(0, 80) });
     }
   }
+
+  const body = buildVolcengineOmniRequestBody({
+    model: finalModel,
+    prompt,
+    imageUrls: resolvedImageUrls,
+    audioReferences: resolvedAudioReferences,
+    ratio,
+    duration: effectiveDuration,
+    resolution,
+    seed,
+    cameraFixed: camera_fixed,
+    webSearch: web_search === true,
+  });
 
   // ===== 全能模式（Seedance 2.0 / Omni）最终请求结构体日志 =====
   // 方便调试确认：图片参考 + 音色参考是否真正被加入 content 数组
@@ -918,148 +963,86 @@ function getDefaultVideoConfig(db, preferredModel) {
   return defaultOne != null ? defaultOne : active[0];
 }
 
-// ?????? API ????? /contents/generations/tasks?base ???????????????
 const VOLC_VIDEO_CREATE_PATH = '/contents/generations/tasks';
 const VOLC_VIDEO_QUERY_PATH = '/contents/generations/tasks';
-
-function getVolcVideoBase(config) {
-  let base = (config.base_url || '').replace(/\/$/, '');
-  base = base.replace(/\/(contents|video)\/.*$/i, '');
-  return base || 'https://ark.cn-beijing.volces.com/api/v3';
-}
 
 /**
  * 非官方火山厂商（中转、自托管等）走 OpenAI/即梦类路径；默认 /video/generations 为旧版中转。
  * volcengine_omni 传入 defaultEndpoint: '/v1/videos/generations' 以对齐方舟文档与 302.ai / jimeng-free-api。
  */
 function buildVideoUrl(config, options = {}) {
-  const p = (config.provider || '').toLowerCase();
-  const isVolc = p === 'volces' || p === 'volcengine' || p === 'volc';
-  if (isVolc) return getVolcVideoBase(config) + VOLC_VIDEO_CREATE_PATH;
-  const base = (config.base_url || '').replace(/\/$/, '');
   const fallbackEp = options.defaultEndpoint != null ? options.defaultEndpoint : '/video/generations';
-  let ep = config.endpoint || fallbackEp;
-  if (!ep.startsWith('/')) ep = '/' + ep;
-  return base + ep;
-}
-
-/**
- * Agnes / new-api 渠道根地址（与 new-api agnes.apiOrigin 一致）：
- * 配置里常带 .../v1 或 .../v1/videos，需剥掉后再拼 /v1/videos/{task_id}。
- */
-function getAgnesApiRoot(baseUrl) {
-  let base = String(baseUrl || 'https://apihub.agnes-ai.com').replace(/\/$/, '');
-  for (const suf of ['/v1/videos', '/v1']) {
-    if (base.length >= suf.length && base.slice(-suf.length).toLowerCase() === suf) {
-      base = base.slice(0, -suf.length).replace(/\/$/, '');
-    }
-  }
-  return base || 'https://apihub.agnes-ai.com';
-}
-
-/** 内置/历史默认查询路径：由代码统一按 new-api 拼装，忽略配置里的旧值 */
-function isAgnesBuiltinQueryEndpoint(ep) {
-  const s = String(ep || '').trim();
-  if (!s) return true;
-  return (
-    /^\/?(v1\/)?videos\/\{(taskId|task_id|id|videoId|video_id)\}\/?$/i.test(s) ||
-    /^\/?agnesapi(\?|$)/i.test(s)
-  );
-}
-
-/**
- * Agnes 结果查询（对齐 new-api TaskAdaptor.FetchTask）：
- * GET {origin}/v1/videos/{task_id}
- */
-function buildAgnesPollUrl(config, pollId) {
-  const root = getAgnesApiRoot(config.base_url);
-  const id = String(pollId || '').trim();
-  const cfgEp = String(config.query_endpoint || '').trim();
-
-  if (cfgEp && !isAgnesBuiltinQueryEndpoint(cfgEp)) {
-    const base = (config.base_url || '').replace(/\/$/, '');
-    let ep = cfgEp;
-    ep = String(ep)
-      .replace(/\{videoId\}/gi, encodeURIComponent(id))
-      .replace(/\{video_id\}/gi, encodeURIComponent(id))
-      .replace(/\{taskId\}/gi, encodeURIComponent(id))
-      .replace(/\{task_id\}/gi, encodeURIComponent(id))
-      .replace(/\{id\}/gi, encodeURIComponent(id));
-    if (!ep.startsWith('/')) ep = '/' + ep;
-    return base + ep;
-  }
-
-  return `${root}/v1/videos/${encodeURIComponent(id)}`;
-}
-
-/**
- * 对齐 new-api：extractVideoURL + taskcommon.ExtractVideoURLFromJSON，
- * 并兼容当前 Agnes 完成态把直链放在 metadata.url（实测 2026-07）。
- */
-function extractAgnesVideoUrl(data) {
-  if (!data || typeof data !== 'object') return null;
-  const nested = (obj, key) =>
-    obj && typeof obj === 'object' && !Array.isArray(obj) ? obj[key] : null;
-  const candidates = [
-    data.video_url,
-    nested(data.content, 'video_url'),
-    nested(data.data, 'video_url'),
-    nested(data.data, 'url'),
-    // 当前官方完成态：metadata.url 才是 MP4 直链
-    nested(data.metadata, 'url'),
-    nested(data.metadata, 'video_url'),
-    nested(data.metadata, 'result_url'),
-    data.remixed_from_video_id,
-    nested(data.data, 'remixed_from_video_id'),
-    data.url,
-  ];
-  for (const c of candidates) {
-    const u = coerceHttpVideoUrl(c);
-    if (u) return u;
-  }
-  return pickProxyVideoUrl(data);
+  const fallback = isOfficialVolcVideoConfig(config) ? VOLC_VIDEO_CREATE_PATH : fallbackEp;
+  return resolveEndpointUrl(config.base_url, config.endpoint, fallback);
 }
 
 function buildQueryUrl(config, taskId) {
   const p = (config.provider || '').toLowerCase();
   const proto = resolveVideoProtocol(config);
   const isDashScope = proto === 'dashscope' || p === 'dashscope';
-  const isVolc = p === 'volces' || p === 'volcengine' || p === 'volc';
   const isSora = proto === 'sora';
-  if (isVolc) return getVolcVideoBase(config) + VOLC_VIDEO_QUERY_PATH + '/' + encodeURIComponent(taskId);
-  if (proto === 'agnes') return buildAgnesPollUrl(config, taskId);
-  const base = (config.base_url || '').replace(/\/$/, '');
   let defaultEp;
-  if (isSora) defaultEp = '/v1/videos/{taskId}';
+  if (isOfficialVolcVideoConfig(config)) defaultEp = `${VOLC_VIDEO_QUERY_PATH}/{id}`;
+  else if (isSora) defaultEp = '/v1/videos/{taskId}';
   else if (proto === 'xai') defaultEp = '/v1/videos/{taskId}';
   else if (proto === 'veo3') defaultEp = '/v1/video/query?id={taskId}';
   else if (isDashScope) defaultEp = '/api/v1/tasks/{taskId}';
   else if (proto === 'volcengine_omni') defaultEp = '/v1/videos/generations/async/{taskId}';
+  else if (proto === 'agnes') defaultEp = '/videos/{taskId}';
   else defaultEp = '/video/task/{taskId}';
-  let ep = config.query_endpoint || defaultEp;
-  ep = String(ep).replace(/\{taskId\}/gi, encodeURIComponent(taskId)).replace(/\{task_id\}/gi, encodeURIComponent(taskId)).replace(/\{id\}/gi, encodeURIComponent(taskId));
-  if (!ep.startsWith('/')) ep = '/' + ep;
-  return base + ep;
+  const ep = replaceTaskId(config.query_endpoint || defaultEp, taskId);
+  return resolveEndpointUrl(config.base_url, ep);
 }
 
-// ????????? ? API ?? ID ???API ????+???????
-const VOLC_MODEL_ALIASES = {
-  'doubao-seedance-1.0-pro-fast':  'doubao-seedance-1-0-pro-250528',
-  'doubao-seedance-1.0-pro':       'doubao-seedance-1-0-pro-250528',
-  'doubao-seedance-1-0-pro':       'doubao-seedance-1-0-pro-250528',
-  'doubao-seedance-1.0-lite':      'doubao-seedance-1-0-lite-250428',
-  'doubao-seedance-1-0-lite':      'doubao-seedance-1-0-lite-250428',
-  'doubao-seedance-1.5-pro':       'doubao-seedance-1-5-pro-251215',
-  'doubao-seedance-1-5-pro':       'doubao-seedance-1-5-pro-251215',
-  'doubao-seedance-2.0-pro':       'doubao-seedance-2-0-260128',
-  'doubao-seedance-2-0-pro':       'doubao-seedance-2-0-260128',
-  'doubao-seedance-2.0-fast':      'doubao-seedance-2-0-fast-260128',
-  'doubao-seedance-2-0-fast':      'doubao-seedance-2-0-fast-260128',
-};
+function isOfficialVolcVideoConfig(config) {
+  const provider = String(config?.provider || '').toLowerCase();
+  return provider === 'volces' || provider === 'volcengine' || provider === 'volc';
+}
+
+async function listVolcengineVideoTasks(config, query = {}) {
+  if (!isOfficialVolcVideoConfig(config)) {
+    return { error: '当前默认视频配置不是火山引擎官方接口' };
+  }
+  const settings = parseConfigSettingsJson(config);
+  const endpoint = resolveEndpointUrl(config.base_url, settings.task_list_endpoint, VOLC_VIDEO_QUERY_PATH);
+  const url = appendSearchParams(endpoint, {
+    page_num: Math.min(500, Math.max(1, Number(query.page_num) || 1)),
+    page_size: Math.min(100, Math.max(1, Number(query.page_size) || 20)),
+    'filter.status': query.status || undefined,
+    'filter.model': query.model || undefined,
+  });
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${config.api_key || ''}`, 'Content-Type': 'application/json' },
+  });
+  const raw = await res.text();
+  let data = {};
+  try { data = raw ? JSON.parse(raw) : {}; } catch (_) {}
+  if (!res.ok) return { error: data?.error?.message || data?.message || `火山任务列表查询失败（HTTP ${res.status}）` };
+  return { items: Array.isArray(data.items) ? data.items : [], total: Number(data.total) || 0 };
+}
+
+async function cancelVolcengineVideoTask(config, taskId) {
+  if (!isOfficialVolcVideoConfig(config)) {
+    return { error: '当前视频配置不支持上游任务取消' };
+  }
+  const settings = parseConfigSettingsJson(config);
+  const template = settings.task_delete_endpoint || `${VOLC_VIDEO_QUERY_PATH}/{id}`;
+  const url = resolveEndpointUrl(config.base_url, replaceTaskId(template, taskId));
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${config.api_key || ''}`, 'Content-Type': 'application/json' },
+  });
+  const raw = await res.text();
+  let data = {};
+  try { data = raw ? JSON.parse(raw) : {}; } catch (_) {}
+  if (!res.ok) return { error: data?.error?.message || data?.message || `火山任务取消/删除失败（HTTP ${res.status}）` };
+  return { ok: true, data };
+}
 
 function normalizeVolcModel(name) {
-  if (!name) return name;
-  return VOLC_MODEL_ALIASES[name.toLowerCase()] || name;
+  // 用户填写的模型 ID 必须原样提交。无论它是否有效，都让上游返回真实错误。
+  return name;
 }
 
 function getModelFromConfig(config, preferredModel) {
@@ -2604,7 +2587,7 @@ async function callAgnesVideoApi(db, config, log, opts) {
     return { error: 'Agnes 响应解析失败: ' + e.message + ' | raw: ' + raw.slice(0, 200) };
   }
 
-  const directUrl = extractAgnesVideoUrl(data);
+  const directUrl = pickProxyVideoUrl(data);
   if (directUrl) {
     log.info('[Agnes] 直接返回 video_url', { video_url: directUrl, video_gen_id });
     return { video_url: directUrl };
@@ -3393,37 +3376,20 @@ function resolveVolcClassicImage(rawUrl, files_base_url, storage_local_path, log
   // 已经是公网 https 且不含 localhost 的，直接返回
   if (/^https?:\/\//i.test(u) && !/localhost|127\.0\.0\.1/i.test(u)) return u;
 
-  const fb = (files_base_url || '').replace(/\/$/, '');
-  const baseIndicatesLocal = fb && /localhost|127\.0\.0\.1/i.test(fb);
-  const urlIndicatesLocal = /localhost|127\.0\.0\.1/i.test(u);
-
-  if ((baseIndicatesLocal || urlIndicatesLocal) && storage_local_path) {
-    let rel = null;
-    const marker = '/static/';
-    const idx = u.toLowerCase().indexOf(marker);
-    if (idx >= 0) {
-      rel = u.slice(idx + marker.length).replace(/^\//, '').split('?')[0];
-    } else if (fb) {
-      rel = u.replace(fb + '/', '').replace(fb, '').replace(/^\//, '').split('?')[0];
-    } else if (!/^https?:\/\//i.test(u)) {
-      // 纯相对路径（来自 local_path 兜底）
-      rel = u.replace(/^\//, '').split('?')[0];
-    }
-    if (rel) {
-      const filePath = path.join(storage_local_path, rel);
-      try {
-        if (fs.existsSync(filePath)) {
-          const buf = fs.readFileSync(filePath);
-          const ext = path.extname(filePath).toLowerCase();
-          const mime = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.bmp': 'image/bmp' }[ext] || 'image/png';
-          const b64 = 'data:' + mime + ';base64,' + buf.toString('base64');
-          if (log && log.info) {
-            log.info('[Volc] 本地首/尾帧已转为 base64 提交', { video_gen_id, role: roleHint, rel: rel.slice(0, 80) });
-          }
-          return b64;
+  if (storage_local_path) {
+    const resolved = resolveStorageFilePath(storage_local_path, u);
+    try {
+      if (resolved && fs.existsSync(resolved.filePath)) {
+        const buf = fs.readFileSync(resolved.filePath);
+        const ext = path.extname(resolved.filePath).toLowerCase();
+        const mime = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.bmp': 'image/bmp' }[ext] || 'image/png';
+        const b64 = 'data:' + mime + ';base64,' + buf.toString('base64');
+        if (log && log.info) {
+          log.info('[Volc] 本地首/尾帧已转为 base64 提交', { video_gen_id, role: roleHint, rel: resolved.relativePath.slice(0, 80) });
         }
-      } catch (_) {}
-    }
+        return b64;
+      }
+    } catch (_) {}
   }
   // 兜底返回原始值（中转或公网会处理）
   return u;
@@ -3433,6 +3399,14 @@ function resolveVolcClassicImage(rawUrl, files_base_url, storage_local_path, log
  * ?????? API?ChatFire/?? ? ?????
  * @returns {Promise<{ task_id?: string, video_url?: string, error?: string }>}
  */
+function resolveRuntimeVideoProtocol(configuredProtocol, model, opts = {}) {
+  const hasExplicitOmniReferences = (Array.isArray(opts.reference_urls) && opts.reference_urls.length > 0)
+    || (Array.isArray(opts.audio_references) && opts.audio_references.length > 0);
+  return configuredProtocol === 'volcengine' && isSeedance2FamilyModel(model) && hasExplicitOmniReferences
+    ? 'volcengine_omni'
+    : configuredProtocol;
+}
+
 async function callVideoApi(db, log, opts) {
   const {
     prompt,
@@ -3458,7 +3432,11 @@ async function callVideoApi(db, log, opts) {
   }
   const model = getModelFromConfig(config, preferredModel);
   const provider = (config.provider || '').toLowerCase();
-  const protocol = resolveVideoProtocol(config, preferredModel);
+  const configuredProtocol = resolveVideoProtocol(config, preferredModel);
+  // 标准 volcengine 与 volcengine_omni 使用同一组用户配置的 Base URL/端点；
+  // 区别只在请求体。Seedance 2.0 有多模态参考时必须构造 content 数组，
+  // 否则会静默退化为 t2v，图片与音频全部丢失。
+  const protocol = resolveRuntimeVideoProtocol(configuredProtocol, model, opts);
   if (db && opts.drama_id && VIDEO_PROTOCOLS_SUPPORT_SD2_ASSET_SCHEME.has(protocol)) {
     opts = applySeedance2CertifiedAssetUrlsToVideoOpts(db, log, opts);
   }
@@ -3466,7 +3444,7 @@ async function callVideoApi(db, log, opts) {
   // Seedance 2.0 自动注入角色音色参考（模型为 SD2 家族，或协议为 volcengine_omni；未显式指定 voice_reference_url 时）
   const isSeedance2 =
     isSeedance2FamilyModel(model) || protocol === 'volcengine_omni';
-  if (isSeedance2 && db && opts.drama_id && !opts.voice_reference_url) {
+  if (isSeedance2 && db && opts.drama_id && !opts.voice_reference_url && !Array.isArray(opts.audio_references)) {
     const voiceMap = collectActiveCharacterVoiceRefs(db, opts.drama_id);
     if (voiceMap.size > 0) {
       // 优先使用分镜显式指定的角色（如果有），否则取第一个
@@ -3509,6 +3487,7 @@ async function callVideoApi(db, log, opts) {
     video_gen_id,
     provider,
     api_protocol_raw: config.api_protocol || '(empty→auto)',
+    configured_protocol: configuredProtocol,
     protocol_used: protocol,
     model,
     endpoint: config.endpoint || '(auto)',
@@ -3611,6 +3590,7 @@ async function callVideoApi(db, log, opts) {
       video_gen_id: opts.video_gen_id,
       // 为将来可灵 Omni 也支持音色参考做准备（当前 Seedance 2.0 不走此分支）
       voice_reference_url: opts.voice_reference_url,
+      audio_references: opts.audio_references,
     });
   }
 
@@ -3631,6 +3611,8 @@ async function callVideoApi(db, log, opts) {
       video_gen_id: opts.video_gen_id,
       // 关键：把 callVideoApi 里自动注入的 Seedance 2.0 音色参考音频透传下去
       voice_reference_url: opts.voice_reference_url,
+      audio_references: opts.audio_references,
+      web_search: opts.web_search === true,
     });
   }
 
@@ -3727,8 +3709,11 @@ async function callVideoApi(db, log, opts) {
     ratio,
     aspect_ratio: ratio,
     duration: effectiveDuration,
-    watermark: (watermark != null) ? Boolean(watermark) : false,
+    watermark: false,
   };
+  // 图生视频、首尾帧和无参考文本模式同样强制生成声音。
+  if (isVolc && isSeedance2FamilyModel(finalModel)) body.generate_audio = true;
+  if (isVolc && opts.web_search === true) body.tools = [{ type: 'web_search' }];
   if (resolution) body.resolution = resolution;
   if (seed != null) body.seed = Number(seed);
   if (camera_fixed != null) body.camera_fixed = Boolean(camera_fixed);
@@ -3851,12 +3836,8 @@ async function pollVideoTask(db, log, videoGenId, taskId, config, maxAttempts = 
     log.warn('[poll] Jimeng AI API 不应进入轮询', { video_gen_id: videoGenId, task_id: taskId });
     return { error: 'Jimeng AI API 为同步返回视频地址，不应进入轮询' };
   }
-  let pollTaskId = taskId;
-  /** Agnes：completed 后 remixed_from_video_id / metadata.url 偶发迟到，对齐 new-api 继续多查几轮 */
-  let agnesCompletedWithoutUrl = 0;
-  const AGNES_COMPLETED_URL_GRACE = 12;
-  const queryUrl = () => buildQueryUrl(config, pollTaskId);
-  log.info('[poll] 开始', { video_gen_id: videoGenId, task_id: pollTaskId, protocol, poll_url: queryUrl() });
+  const queryUrl = () => buildQueryUrl(config, taskId);
+  log.info('[poll] ????', { video_gen_id: videoGenId, task_id: taskId, protocol, poll_url: queryUrl() });
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     await new Promise((r) => setTimeout(r, intervalMs));
     try {
@@ -4039,39 +4020,20 @@ async function pollVideoTask(db, log, videoGenId, taskId, config, maxAttempts = 
 
       if (isAgnes) {
         const status = extractPollTaskStatus(data);
-        log.info('[Agnes poll] 状态', {
-          video_gen_id: videoGenId,
-          attempt,
-          status,
-          progress: data.progress,
-          id: data.id,
-          poll_id: pollTaskId,
-          poll_url: queryUrl(),
-        });
+        log.info('[Agnes poll] 状态', { video_gen_id: videoGenId, attempt, status, progress: data.progress, id: data.id });
         if (isPollTaskFailed(status)) {
           const msg = extractPollFailureMessage(data) || 'Agnes 视频任务失败';
           log.warn('[Agnes poll] 任务失败', { video_gen_id: videoGenId, msg, data: JSON.stringify(data).slice(0, 300) });
           return { error: String(msg).slice(0, 500) };
         }
-        // 对齐 new-api ParseTaskResult / ExtractVideoURLFromJSON（含 metadata.url、remixed_from_video_id）
-        const videoUrl = extractAgnesVideoUrl(data);
+        const videoUrl = pickProxyVideoUrl(data);
         if (videoUrl && isPlausibleHttpVideoUrl(videoUrl)) {
           log.info('[Agnes poll] 完成', { video_gen_id: videoGenId, video_url: videoUrl });
           return { video_url: videoUrl };
         }
         if (status === 'succeeded' || status === 'completed' || status === 'done') {
-          agnesCompletedWithoutUrl += 1;
-          log.warn('[Agnes poll] completed 但尚未返回视频直链，继续等待', {
-            video_gen_id: videoGenId,
-            miss: agnesCompletedWithoutUrl,
-            grace: AGNES_COMPLETED_URL_GRACE,
-            data: JSON.stringify(data).slice(0, 500),
-          });
-          if (agnesCompletedWithoutUrl >= AGNES_COMPLETED_URL_GRACE) {
-            return {
-              error: 'Agnes 任务完成但未返回视频地址: ' + JSON.stringify(data).slice(0, 300),
-            };
-          }
+          log.warn('[Agnes poll] 标记完成但未返回 video_url', { video_gen_id: videoGenId, data: JSON.stringify(data).slice(0, 500) });
+          return { error: 'Agnes 任务完成但未返回视频地址: ' + JSON.stringify(data).slice(0, 300) };
         }
         continue;
       }
@@ -4174,12 +4136,19 @@ module.exports = {
   pollVideoTask,
   normalizeAspectRatioForApi,
   isPlausibleHttpVideoUrl,
+  listVolcengineVideoTasks,
+  cancelVolcengineVideoTask,
   pickProxyVideoUrl,
-  extractAgnesVideoUrl,
-  buildAgnesPollUrl,
-  getAgnesApiRoot,
   buildAgnesVideoImagePayload,
   formatVideoPostBodyForLog,
   isSeedance2FamilyModel,
   normalizeVolcengineDuration,
+  resolveImageInputForOmniLocalBase64,
+  resolveVolcClassicImage,
+  resolveVideoProtocol,
+  resolveRuntimeVideoProtocol,
+  buildVideoUrl,
+  buildQueryUrl,
+  normalizeOfficialMediaPrompt,
+  buildVolcengineOmniRequestBody,
 };

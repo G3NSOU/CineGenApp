@@ -60,8 +60,8 @@ function createStoryboard(db, log, req) {
   const episodeId = Number(req.episode_id);
   const num = Number(req.storyboard_number ?? 0) || 0;
   const info = db.prepare(
-    `INSERT INTO storyboards (episode_id, scene_id, storyboard_number, title, description, location, time, duration, dialogue, action, result, atmosphere, image_prompt, video_prompt, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
+    `INSERT INTO storyboards (episode_id, scene_id, storyboard_number, title, description, location, time, duration, dialogue, action, result, atmosphere, image_prompt, video_prompt, creation_mode, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
   ).run(
     episodeId,
     req.scene_id ?? null,
@@ -77,6 +77,7 @@ function createStoryboard(db, log, req) {
     req.atmosphere ?? null,
     req.image_prompt ?? null,
     req.video_prompt ?? null,
+    req.creation_mode === 'custom_multi_reference' ? 'custom_multi_reference' : (req.creation_mode === 'universal' ? 'universal' : 'classic'),
     now,
     now
   );
@@ -180,7 +181,7 @@ function getStoryboardById(db, id) {
     movement: r.movement,
     segment_index: r.segment_index ?? 0,
     segment_title: r.segment_title ?? null,
-    creation_mode: r.creation_mode === 'universal' ? 'universal' : 'classic',
+    creation_mode: ['classic', 'universal', 'custom_multi_reference'].includes(r.creation_mode) ? r.creation_mode : 'classic',
     universal_segment_text: r.universal_segment_text ?? null,
     layout_description: r.layout_description ?? null,
     first_frame_image_id: r.first_frame_image_id ?? null,

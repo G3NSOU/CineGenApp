@@ -116,6 +116,7 @@ function testConnection(log) {
         model: body.model,
         provider: body.provider,
         endpoint: body.endpoint,
+        query_endpoint: body.query_endpoint,
         service_type: body.service_type,
         settings: body.settings,
       });

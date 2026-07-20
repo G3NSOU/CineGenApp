@@ -1,27 +1,5 @@
-import { ref, watchEffect } from 'vue'
-
-const STORAGE_KEY = 'lmd-theme'
-const isDark = ref(localStorage.getItem(STORAGE_KEY) === 'dark')
-
-function apply() {
-  if (isDark.value) {
-    document.documentElement.classList.remove('light')
-    document.documentElement.classList.add('dark')
-  } else {
-    document.documentElement.classList.remove('dark')
-    document.documentElement.classList.add('light')
-  }
-  localStorage.setItem(STORAGE_KEY, isDark.value ? 'dark' : 'light')
-}
-
-// 初始立即应用一次
-apply()
-
-watchEffect(apply)
-
-export function useTheme() {
-  function toggle() {
-    isDark.value = !isDark.value
-  }
-  return { isDark, toggle }
-}
+// CineGen 采用单一深色视觉系统。清除旧版本留下的主题偏好，避免缓存恢复浅色 UI。
+localStorage.removeItem('lmd-theme')
+localStorage.removeItem('cgp-theme-version')
+document.documentElement.classList.remove('light')
+document.documentElement.classList.add('dark')

@@ -1,8 +1,8 @@
 # 贡献指南 / Contributing Guide
 
-感谢你对 LocalMiniDrama 的关注！无论是报告 Bug、提功能建议，还是贡献代码，都非常欢迎。
+感谢你对 CineGen 的关注！无论是报告 Bug、提功能建议，还是贡献代码，都非常欢迎。
 
-> Thank you for your interest in LocalMiniDrama! All forms of contribution are welcome — bug reports, feature suggestions, or code.
+> Thank you for your interest in CineGen! All forms of contribution are welcome — bug reports, feature suggestions, or code.
 
 ---
 
@@ -47,8 +47,8 @@ By participating, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md
 
 ```bash
 # 1. Fork 本仓库，然后克隆你的 Fork
-git clone https://github.com/你的用户名/LocalMiniDrama.git
-cd LocalMiniDrama
+git clone https://github.com/你的用户名/CineGenApp.git
+cd CineGenApp
 
 # 2. 创建功能分支（从 main 分支切出）
 git checkout -b feature/your-feature-name
@@ -75,16 +75,13 @@ git push origin feature/your-feature-name
 
 ## 开发环境搭建 / Development Setup
 
-> 需要 Node.js >= 18 / Requires Node.js >= 18
+> 需要 Node.js 22.x / Requires Node.js 22.x
 
 ### 启动后端
 
 ```bash
 cd backend-node
 npm install
-cp configs/config.example.yaml configs/config.yaml
-# 编辑 config.yaml，填入你的 AI API 配置
-npm run migrate   # 首次运行，初始化数据库
 npm start         # 默认端口 5679
 ```
 
@@ -111,7 +108,7 @@ npm start
 ```
 
 > Electron 开发需要安装 Python 3 和 Visual Studio C++ 生成工具（用于编译 better-sqlite3）。  
-> 详见 [快速开始文档](docs/quickstart.md)。
+> 桌面发行包必须通过仓库内的纯净数据审计脚本，不得包含用户数据库或凭据。
 
 ---
 
@@ -156,5 +153,5 @@ docs: 更新 AI 配置指南中的火山引擎配置说明
 
 ---
 
-再次感谢你的贡献！有任何疑问欢迎在 Issue 中提问或加入微信群交流。  
-Thanks again for contributing! Feel free to open an issue or join the WeChat group if you have any questions.
+再次感谢你的贡献！有任何疑问欢迎在 Issue 中提问。
+Thanks again for contributing! Feel free to open an issue if you have any questions.

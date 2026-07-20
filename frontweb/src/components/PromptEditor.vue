@@ -30,7 +30,7 @@
         <!-- 右侧编辑区 -->
         <div class="right-content">
           <p class="page-desc">
-            可自定义 AI 生成各阶段使用的提示词（System Prompt）。蓝色锁定区为 JSON
+            可自定义 AI 生成各阶段使用的提示词（System Prompt）。锁定区域为 JSON
             格式要求，不可修改以确保输出格式正确。
           </p>
 
@@ -233,7 +233,7 @@ onMounted(() => load())
   padding: 12px 16px;
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: color var(--motion-fast) var(--motion-ease-out), background-color var(--motion-fast) var(--motion-ease-out), transform var(--motion-fast) var(--motion-ease-out);
   margin-bottom: 4px;
   position: relative;
 }

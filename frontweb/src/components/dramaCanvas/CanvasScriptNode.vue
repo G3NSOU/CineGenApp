@@ -11,7 +11,7 @@
       <Handle type="source" :position="Position.Right" />
       <CanvasNodeStatusOverlay :node-id="id" />
       <div class="head">
-        <span class="badge">📜 剧本</span>
+        <span class="badge"><el-icon><Document /></el-icon>剧本</span>
         <span class="ep">第 {{ data.episode?.episode_number ?? '?' }} 集</span>
       </div>
       <div class="preview">{{ previewText }}</div>
@@ -36,6 +36,7 @@ import { Handle, Position } from '@vue-flow/core'
 import { useCanvasContext } from '@/composables/useCanvasContext'
 import CanvasScriptPanel from './CanvasScriptPanel.vue'
 import CanvasNodeStatusOverlay from './CanvasNodeStatusOverlay.vue'
+import { Document } from '@element-plus/icons-vue'
 
 const props = defineProps({
   id: { type: String, required: true },

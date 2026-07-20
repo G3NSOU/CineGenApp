@@ -1,11 +1,10 @@
 <template>
   <div class="drama-canvas-page">
-    <header class="header">
-      <div class="header-inner">
-        <h1 class="logo" @click="router.push('/')">
-          <span class="logo-main">本地短剧助手</span>
-          <span class="logo-sub">画布模式</span>
-        </h1>
+    <Teleport to="#app-header-context">
+      <div class="cgp-route-context cgp-route-context--canvas" :key="`canvas-${drama?.id || 'loading'}`">
+        <el-button text class="cgp-context-home" @click="router.push('/')">
+          <el-icon><ArrowLeft /></el-icon>项目
+        </el-button>
         <span class="breadcrumb-sep">›</span>
         <span class="page-title">{{ drama?.title || '加载中…' }}</span>
 
@@ -29,7 +28,7 @@
         <span v-else-if="layoutSaveState === 'saved'" class="layout-status saved">已保存</span>
         <span v-else-if="layoutSaveState === 'error'" class="layout-status error">保存失败</span>
 
-        <div class="header-actions">
+        <div class="cgp-context-actions">
           <el-button size="small" type="warning" plain @click="focusScriptNode">
             剧本
           </el-button>
@@ -52,13 +51,11 @@
             <el-icon><List /></el-icon>
             列表模式
           </el-button>
-          <el-button class="btn-theme" @click="toggleTheme">
-            <el-icon><Sunny v-if="isDark" /><Moon v-else /></el-icon>
-            {{ isDark ? '浅色' : '暗色' }}
-          </el-button>
         </div>
       </div>
+    </Teleport>
 
+    <header class="canvas-tools-header">
       <div class="workflow-bar">
         <span class="wf-hint">已选 {{ selectedStoryboardIds.length }} 个分镜</span>
         <el-checkbox-group v-model="pipelineSteps" size="small" class="wf-steps">
@@ -135,7 +132,7 @@
       <aside v-if="drama" class="canvas-sidebar">
         <div class="sidebar-section sidebar-script">
           <div class="sec-label sec-label-row">
-            <span>📜 剧本</span>
+            <span class="icon-label"><el-icon><Document /></el-icon>剧本</span>
             <el-button link size="small" type="warning" @click="focusScriptNode">编辑</el-button>
           </div>
           <p class="sidebar-script-tip">从头创作：先写剧本，再提取左侧素材</p>
@@ -265,7 +262,7 @@ import { VueFlow } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
-import { List, Moon, Plus, Sunny, Grid } from '@element-plus/icons-vue'
+import { ArrowLeft, List, Plus, Grid, Document } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 import '@vue-flow/core/dist/style.css'
@@ -274,7 +271,6 @@ import '@vue-flow/controls/dist/style.css'
 import '@vue-flow/minimap/dist/style.css'
 
 import { dramaAPI } from '@/api/drama'
-import { useTheme } from '@/composables/useTheme'
 import { runWorkflowGroup } from '@/composables/useCanvasWorkflowRunner'
 import { CANVAS_CONTEXT_KEY } from '@/composables/useCanvasContext'
 import { useCanvasStoryboardMedia } from '@/composables/useCanvasStoryboardMedia'
@@ -320,7 +316,6 @@ import CanvasFlowAligner from '@/components/dramaCanvas/CanvasFlowAligner.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { isDark, toggle: toggleTheme } = useTheme()
 const { imagesBySbId, videosBySbId, loadForDrama } = useCanvasStoryboardMedia()
 
 const loading = ref(false)
@@ -993,19 +988,21 @@ onBeforeUnmount(() => {
   margin: 0;
   cursor: pointer;
   display: flex;
-  flex-direction: column;
-  line-height: 1.2;
+  line-height: 1;
+  flex: 0 0 auto;
+  overflow: visible;
+  padding-right: 6px;
 }
 
 .logo-main {
-  font-size: 15px;
+  display: inline-block;
+  padding-right: 0.16em;
+  font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', 'Arial Narrow', sans-serif;
+  font-size: 1.35rem;
   font-weight: 700;
+  font-style: italic;
+  letter-spacing: 0.035em;
   color: var(--text-bright, #fafafa);
-}
-
-.logo-sub {
-  font-size: 11px;
-  color: #818cf8;
 }
 
 .breadcrumb-sep { color: var(--text-faint, #52525b); }

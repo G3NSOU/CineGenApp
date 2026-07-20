@@ -260,7 +260,7 @@ function getStoryboardsForEpisode(db, episodeId) {
       movement: r.movement,
       segment_index: r.segment_index ?? 0,
       segment_title: r.segment_title ?? null,
-      creation_mode: r.creation_mode === 'universal' ? 'universal' : 'classic',
+      creation_mode: ['classic', 'universal', 'custom_multi_reference'].includes(r.creation_mode) ? r.creation_mode : 'classic',
       universal_segment_text: r.universal_segment_text ?? null,
       characters: (() => {
         if (!r.characters) return [];
@@ -688,7 +688,7 @@ function saveStoryboards(db, log, episodeId, storyboards, cfg, styleOverride, sk
           movement: refreshed.movement,
           segment_index: refreshed.segment_index ?? 0,
           segment_title: refreshed.segment_title ?? null,
-          creation_mode: refreshed.creation_mode === 'universal' ? 'universal' : 'classic',
+          creation_mode: ['classic', 'universal', 'custom_multi_reference'].includes(refreshed.creation_mode) ? refreshed.creation_mode : 'classic',
           universal_segment_text: refreshed.universal_segment_text ?? null,
           characters: (() => { try { return JSON.parse(refreshed.characters || '[]'); } catch (_) { return []; } })(),
           prop_ids: propIds,

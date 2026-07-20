@@ -10,6 +10,7 @@ const jimengMaterialHubService = require('./jimengMaterialHubService');
 const modelArkAssetConfigService = require('./modelArkAssetConfigService');
 const uploadService = require('./uploadService');
 const seedance2AssetGuards = require('../utils/seedance2AssetGuards');
+const materialVersionService = require('./materialVersionService');
 const {
   appendSourceIdFilters,
   findExistingLibraryItem,
@@ -159,16 +160,18 @@ function getLibraryItem(db, id) {
 }
 
 function updateLibraryItem(db, log, id, req) {
-  const row = db.prepare('SELECT id FROM character_libraries WHERE id = ? AND deleted_at IS NULL').get(Number(id));
+  const row = db.prepare('SELECT * FROM character_libraries WHERE id = ? AND deleted_at IS NULL').get(Number(id));
   if (!row) return null;
+  const imageChanged = materialVersionService.recordReplacement(db, 'character', id, row, req);
   const updates = [];
   const params = [];
   if (req.name != null) { updates.push('name = ?'); params.push(req.name); }
   if (req.category != null) { updates.push('category = ?'); params.push(req.category); }
   if (req.description != null) { updates.push('description = ?'); params.push(req.description); }
   if (req.tags != null) { updates.push('tags = ?'); params.push(req.tags); }
-  if (req.image_url != null) { updates.push('image_url = ?'); params.push(req.image_url); }
-  if (req.local_path != null) { updates.push('local_path = ?'); params.push(req.local_path); }
+  if (Object.hasOwn(req, 'image_url')) { updates.push('image_url = ?'); params.push(req.image_url); }
+  if (Object.hasOwn(req, 'local_path')) { updates.push('local_path = ?'); params.push(req.local_path); }
+  if (imageChanged) updates.push('tos_url = NULL', 'tos_object_key = NULL', 'tos_synced_at = NULL', 'tos_expires_at = NULL');
   if (req.source_type != null) { updates.push('source_type = ?'); params.push(req.source_type); }
   if (req.source_id != null) { updates.push('source_id = ?'); params.push(normalizeSourceId(req.source_id)); }
   if (updates.length === 0) return getLibraryItem(db, id);
@@ -387,6 +390,11 @@ function rowToItem(r) {
     tags: r.tags,
     source_type: r.source_type || 'generated',
     source_id: r.source_id || null,
+    voice_library_id: r.voice_library_id ?? null,
+    tos_url: r.tos_url || null,
+    tos_object_key: r.tos_object_key || null,
+    tos_synced_at: r.tos_synced_at || null,
+    tos_expires_at: r.tos_expires_at || null,
     created_at: r.created_at,
     updated_at: r.updated_at,
   };

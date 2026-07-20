@@ -1,7 +1,7 @@
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 
 function createTask(db, log, taskType, resourceId) {
-  const id = uuidv4();
+  const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
     `INSERT INTO async_tasks (id, type, status, progress, message, resource_id, created_at, updated_at)

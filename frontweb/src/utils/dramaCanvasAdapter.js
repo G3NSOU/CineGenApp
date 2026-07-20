@@ -75,9 +75,9 @@ function buildAssetNodes(drama, savedLayout, startY) {
   let y = startY
 
   const sections = [
-    { key: 'characters', label: '👤 角色', hint: '从剧本提取', items: drama.characters || [], kind: 'character', prefix: 'char' },
-    { key: 'scenes', label: '🏞 场景', hint: '从剧本提取', items: drama.scenes || [], kind: 'scene', prefix: 'scene' },
-    { key: 'props', label: '🎭 道具', hint: '从剧本提取', items: drama.props || [], kind: 'prop', prefix: 'prop' },
+    { key: 'characters', label: '角色', hint: '从剧本提取', items: drama.characters || [], kind: 'character', prefix: 'char' },
+    { key: 'scenes', label: '场景', hint: '从剧本提取', items: drama.scenes || [], kind: 'scene', prefix: 'scene' },
+    { key: 'props', label: '道具', hint: '从剧本提取', items: drama.props || [], kind: 'prop', prefix: 'prop' },
   ]
 
   for (const sec of sections) {

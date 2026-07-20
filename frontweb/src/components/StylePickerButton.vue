@@ -63,7 +63,7 @@
                 <span v-if="!opt.thumb" class="spd-thumb-text">{{ opt.label.slice(0, 2) }}</span>
               </div>
               <div class="spd-name">{{ opt.label }}</div>
-              <div v-if="modelValue === opt.value" class="spd-check">✓</div>
+              <div v-if="modelValue === opt.value" class="spd-check"><el-icon><Check /></el-icon></div>
             </div>
           </div>
         </template>
@@ -80,7 +80,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { ArrowDown, CircleClose, Search } from '@element-plus/icons-vue'
+import { ArrowDown, Check, CircleClose, Search } from '@element-plus/icons-vue'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },

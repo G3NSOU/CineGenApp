@@ -15,7 +15,7 @@
       <Handle type="source" :position="Position.Right" />
       <div class="cover">
         <img v-if="thumbUrl && !isNodeBusy" :src="thumbUrl" alt="" />
-        <div v-else-if="!isNodeBusy" class="cover-placeholder">{{ kindIcon }}</div>
+        <div v-else-if="!isNodeBusy" class="cover-placeholder"><el-icon><component :is="kindIcon" /></el-icon></div>
         <CanvasNodeStatusOverlay :node-id="id" />
       </div>
       <div class="info">
@@ -42,6 +42,7 @@ import { assetImageUrl } from '@/utils/mediaUrl'
 import { useCanvasContext } from '@/composables/useCanvasContext'
 import CanvasAssetPanel from './CanvasAssetPanel.vue'
 import CanvasNodeStatusOverlay from './CanvasNodeStatusOverlay.vue'
+import { User, PictureFilled, Box } from '@element-plus/icons-vue'
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -57,8 +58,8 @@ const kindLabel = computed(() => {
 })
 
 const kindIcon = computed(() => {
-  const map = { character: '👤', scene: '🏞', prop: '🎭' }
-  return map[props.data.kind] || '📦'
+  const map = { character: User, scene: PictureFilled, prop: Box }
+  return map[props.data.kind] || Box
 })
 
 const displayName = computed(() => {

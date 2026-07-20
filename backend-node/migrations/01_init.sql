@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS characters (
   image_url TEXT,
   local_path TEXT,
   voice_style TEXT,
+  voice_library_id INTEGER,
   sort_order INTEGER DEFAULT 0,
   created_at TEXT,
   updated_at TEXT,
@@ -202,6 +203,10 @@ CREATE TABLE IF NOT EXISTS video_generations (
   first_frame_url TEXT,
   last_frame_url TEXT,
   reference_image_urls TEXT,
+  generation_mode TEXT,
+  reference_assets TEXT,
+  generation_config TEXT,
+  voice_reference_url TEXT,
   video_url TEXT,
   local_path TEXT,
   status TEXT,
@@ -239,6 +244,40 @@ CREATE TABLE IF NOT EXISTS character_libraries (
   tags TEXT,
   source_type TEXT,
   source_id TEXT,
+  voice_library_id INTEGER,
+  created_at TEXT,
+  updated_at TEXT,
+  deleted_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS audio_libraries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  drama_id INTEGER,
+  name TEXT NOT NULL DEFAULT '',
+  category TEXT DEFAULT 'audio',
+  description TEXT,
+  audio_url TEXT NOT NULL DEFAULT '',
+  local_path TEXT,
+  mime_type TEXT,
+  duration REAL,
+  source_type TEXT DEFAULT 'upload',
+  source_id TEXT,
+  created_at TEXT,
+  updated_at TEXT,
+  deleted_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS voice_libraries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  collection_name TEXT DEFAULT '默认音色集',
+  name TEXT NOT NULL DEFAULT '',
+  description TEXT,
+  audio_url TEXT NOT NULL DEFAULT '',
+  local_path TEXT,
+  mime_type TEXT,
+  duration REAL,
+  version_name TEXT DEFAULT '主音色',
+  metadata TEXT,
   created_at TEXT,
   updated_at TEXT,
   deleted_at TEXT

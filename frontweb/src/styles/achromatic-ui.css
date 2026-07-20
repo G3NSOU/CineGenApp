@@ -1,0 +1,693 @@
+/* CineGen achromatic material contract.
+   This file intentionally loads last: feature styles may define geometry, but
+   every non-semantic surface is resolved to neutral, equal-channel RGB here. */
+
+:root,
+html.dark {
+  color-scheme: dark;
+
+  --cgp-glass: rgba(18, 18, 18, .46);
+  --cgp-glass-strong: rgba(18, 18, 18, .7);
+  --cgp-glass-soft: rgba(235, 235, 235, .03);
+  --cgp-border: rgba(235, 235, 235, .1);
+  --cgp-border-strong: rgba(235, 235, 235, .18);
+  --cgp-text: #e7e7e7;
+  --cgp-text-muted: #a7a7a7;
+  --cgp-text-faint: #777;
+
+  --ui-panel: rgba(18, 18, 18, .46);
+  --ui-panel-solid: #1b1b1b;
+  --ui-panel-raised: rgba(18, 18, 18, .6);
+  --ui-panel-muted: rgba(235, 235, 235, .025);
+  --ui-control-bg: rgba(235, 235, 235, .045);
+  --ui-control-hover: rgba(235, 235, 235, .075);
+  --ui-divider: rgba(235, 235, 235, .075);
+  --ui-edge: rgba(235, 235, 235, .1);
+  --ui-edge-hot: rgba(235, 235, 235, .2);
+  --ui-focus: rgba(235, 235, 235, .32);
+  --ui-accent: #dedede;
+  --ui-accent-2: #b8b8b8;
+  --ui-accent-soft: rgba(235, 235, 235, .085);
+  --ui-shadow-panel: 0 16px 44px rgba(0, 0, 0, .22), inset 0 1px 0 rgba(235, 235, 235, .035);
+  --ui-shadow-float: 0 24px 72px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(235, 235, 235, .055);
+
+  --liquid-frost-bg: rgba(18, 18, 18, .68);
+  --liquid-edge-bg: rgba(235, 235, 235, .04);
+  --liquid-edge-border: rgba(235, 235, 235, .1);
+  --liquid-pulse-bg: rgba(235, 235, 235, .075);
+  --liquid-pulse-glow: rgba(235, 235, 235, .11);
+
+  --work-panel: rgba(18, 18, 18, .4);
+  --work-panel-raised: rgba(18, 18, 18, .56);
+  --work-panel-soft: rgba(235, 235, 235, .025);
+  --work-border: rgba(235, 235, 235, .095);
+  --work-border-strong: rgba(235, 235, 235, .18);
+  --work-input: rgba(5, 5, 5, .2);
+  --work-control: rgba(235, 235, 235, .04);
+  --work-control-hover: rgba(235, 235, 235, .075);
+
+  --el-bg-color: rgba(18, 18, 18, .9);
+  --el-bg-color-page: transparent;
+  --el-bg-color-overlay: rgba(20, 20, 20, .92);
+  --el-fill-color: rgba(235, 235, 235, .055);
+  --el-fill-color-light: rgba(235, 235, 235, .04);
+  --el-fill-color-lighter: rgba(235, 235, 235, .028);
+  --el-fill-color-extra-light: rgba(235, 235, 235, .018);
+  --el-fill-color-dark: rgba(5, 5, 5, .25);
+  --el-fill-color-darker: rgba(5, 5, 5, .38);
+  --el-border-color: rgba(235, 235, 235, .11);
+  --el-border-color-light: rgba(235, 235, 235, .085);
+  --el-border-color-lighter: rgba(235, 235, 235, .06);
+  --el-border-color-extra-light: rgba(235, 235, 235, .04);
+  --el-text-color-primary: #e7e7e7;
+  --el-text-color-regular: #c5c5c5;
+  --el-text-color-secondary: #9b9b9b;
+  --el-text-color-placeholder: #727272;
+  --el-text-color-disabled: #5f5f5f;
+  --el-color-primary: #d8d8d8;
+  --el-color-primary-light-3: #c4c4c4;
+  --el-color-primary-light-5: #a7a7a7;
+  --el-color-primary-light-7: rgba(235, 235, 235, .15);
+  --el-color-primary-light-8: rgba(235, 235, 235, .1);
+  --el-color-primary-light-9: rgba(235, 235, 235, .055);
+  --el-color-primary-dark-2: #bcbcbc;
+}
+
+/* Persistent chrome is deliberately denser than content glass. */
+html.dark body .app-top-header,
+html.dark body .materials-sidebar,
+html.dark body .film-create .quick-nav,
+html.dark body .drama-canvas-page .canvas-sidebar,
+html.dark body .prompt-editor-page .left-sidebar {
+  border-color: rgba(235, 235, 235, .085) !important;
+  background: linear-gradient(145deg, rgba(235, 235, 235, .018), transparent 48%), rgba(18, 18, 18, .7) !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, .18), inset 0 1px 0 rgba(235, 235, 235, .035) !important;
+  backdrop-filter: blur(30px) saturate(105%) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(105%) !important;
+}
+
+html.dark body :is(
+  .drama-detail > .header,
+  .film-create > .header,
+  .studio-page > .studio-header,
+  .drama-canvas-page > .header,
+  .ai-config > .header
+) {
+  border-color: rgba(235, 235, 235, .085) !important;
+  background: rgba(18, 18, 18, .64) !important;
+  box-shadow: inset 0 -1px 0 rgba(235, 235, 235, .025) !important;
+  backdrop-filter: blur(30px) saturate(105%) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(105%) !important;
+}
+
+/* Major page membranes: transparent enough for the colored backdrop to read. */
+html.dark body :is(
+  .project-card,
+  .action-card,
+  .drama-detail .section.card,
+  .film-create .section.card,
+  .studio-page .panel-surface,
+  .free-create-page .input-panel,
+  .free-create-page .result-panel,
+  .media-library-page .filter-bar,
+  .ai-config .config-card,
+  .global-ai-config-dialog .config-card
+) {
+  border-color: var(--work-border) !important;
+  background: linear-gradient(145deg, rgba(235, 235, 235, .028), rgba(235, 235, 235, .006) 52%, transparent 78%), var(--work-panel) !important;
+  box-shadow: var(--ui-shadow-panel) !important;
+  backdrop-filter: blur(25px) saturate(105%) !important;
+  -webkit-backdrop-filter: blur(25px) saturate(105%) !important;
+}
+
+/* Repeated cards use a light glass membrane, never a tinted solid fill. */
+html.dark body :is(
+  .episode-card,
+  .library-item,
+  .drama-res-item,
+  .storyboard-row,
+  .resource-block,
+  .asset-item,
+  .script-sub-block,
+  .script-preview-wrap,
+  .subproject-item,
+  .video-list-item,
+  .history-item,
+  .asset-card,
+  .media-asset-card,
+  .media-card,
+  .material-card,
+  .audio-reference-chip,
+  .voice-binding-panel
+) {
+  border-color: rgba(235, 235, 235, .09) !important;
+  background: rgba(235, 235, 235, .025) !important;
+  box-shadow: inset 0 1px 0 rgba(235, 235, 235, .018) !important;
+}
+
+html.dark body :is(
+  .episode-card,
+  .library-item,
+  .drama-res-item,
+  .storyboard-row,
+  .resource-block,
+  .asset-item,
+  .subproject-item,
+  .video-list-item,
+  .history-item,
+  .asset-card,
+  .media-asset-card,
+  .media-card,
+  .material-card
+):hover {
+  border-color: rgba(235, 235, 235, .17) !important;
+  background: rgba(235, 235, 235, .05) !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .17), inset 0 1px 0 rgba(235, 235, 235, .032) !important;
+}
+
+/* The shared repeated-card membrane is intentionally very light, but the
+ * full-page material library needs a stable reading surface over animated
+ * backgrounds. Keep this exception local to the library. */
+html.dark:not(.cinegen-simple) body #app .materials-page .material-card {
+  border-color: rgba(235, 235, 235, .115) !important;
+  background: rgba(24, 25, 26, .58) !important;
+  box-shadow: 0 12px 30px rgba(3, 4, 4, .2), inset 0 1px 0 rgba(242, 244, 239, .035) !important;
+}
+html.dark:not(.cinegen-simple) body #app .materials-page .material-card:hover {
+  border-color: rgba(235, 235, 235, .2) !important;
+  background: rgba(28, 29, 30, .66) !important;
+  box-shadow: 0 17px 38px rgba(3, 4, 4, .27), inset 0 1px 0 rgba(242, 244, 239, .05) !important;
+}
+html.dark:not(.cinegen-simple) body #app .materials-page .content-heading-actions .el-button {
+  border-color: rgba(235, 235, 235, .16) !important;
+  color: #d9dbd6 !important;
+  background: rgba(27, 28, 29, .58) !important;
+  box-shadow: 0 7px 20px rgba(3, 4, 4, .18), inset 0 1px 0 rgba(242, 244, 239, .05) !important;
+}
+html.dark:not(.cinegen-simple) body #app .materials-page .content-heading-actions .el-button--primary {
+  border-color: rgba(235, 235, 235, .25) !important;
+  color: #eceee9 !important;
+  background: rgba(235, 235, 235, .13) !important;
+  box-shadow: 0 8px 22px rgba(3, 4, 4, .2), inset 0 1px 0 rgba(248, 249, 246, .11) !important;
+}
+
+/* The low-cost appearance stays fully opaque. Placing this local exception
+ * after the shared translucent rules prevents their cascade from washing out
+ * the material-library actions. */
+html.dark.cinegen-simple body #app .materials-page .content-heading-actions .el-button {
+  border-color: #32353a !important;
+  color: #d9dbd6 !important;
+  background: #222429 !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+html.dark.cinegen-simple body #app .materials-page .content-heading-actions .el-button--primary {
+  border-color: #4a4d54 !important;
+  color: #ededed !important;
+  background: #35383e !important;
+}
+
+html.dark body :is(
+  .subproject-item.active,
+  .video-list-item.active,
+  .media-card.selected,
+  .asset-card.is-active,
+  .drama-detail .res-tab.active,
+  .drama-canvas-page .sidebar-item.active
+) {
+  color: #e5e5e5 !important;
+  border-color: rgba(235, 235, 235, .2) !important;
+  background: rgba(235, 235, 235, .075) !important;
+  box-shadow: inset 0 1px 0 rgba(235, 235, 235, .04) !important;
+}
+
+html.dark body :is(
+  .drama-detail .res-tabbar,
+  .studio-page .studio-workspace,
+  .studio-page .preview-stage,
+  .film-create .sb-ctrl-bar,
+  .film-create .script-mode-hint,
+  .resource-block-header,
+  .collapse-header
+) {
+  border-color: rgba(235, 235, 235, .08) !important;
+  background: rgba(5, 5, 5, .2) !important;
+  box-shadow: inset 0 1px 0 rgba(235, 235, 235, .015) !important;
+}
+
+html.dark body .studio-page .preview-stage {
+  background: radial-gradient(ellipse 52% 42% at 50% 38%, rgba(235, 235, 235, .024), transparent 72%), rgba(5, 5, 5, .25) !important;
+}
+
+/* Neutral form focus: luminance changes, no purple/blue halo. */
+html.dark body :is(
+  .el-input__wrapper,
+  .el-select__wrapper,
+  .el-textarea__inner,
+  .el-input-number,
+  .el-date-editor,
+  .omni-at-editor
+) {
+  border-color: rgba(235, 235, 235, .095) !important;
+  background: rgba(5, 5, 5, .2) !important;
+  box-shadow: inset 0 1px 0 rgba(235, 235, 235, .015) !important;
+}
+
+html.dark body :is(
+  .el-input__wrapper,
+  .el-select__wrapper,
+  .el-textarea__inner,
+  .el-input-number,
+  .el-date-editor,
+  .omni-at-editor
+):hover {
+  border-color: rgba(235, 235, 235, .17) !important;
+  background: rgba(235, 235, 235, .03) !important;
+}
+
+html.dark body :is(
+  .el-input__wrapper.is-focus,
+  .el-select__wrapper.is-focused,
+  .el-textarea__inner:focus,
+  .el-textarea__inner:focus-visible,
+  .el-input-number:focus-within,
+  .el-date-editor:focus-within,
+  .omni-at-editor:focus,
+  .omni-at-editor:focus-visible
+) {
+  border-color: rgba(235, 235, 235, .3) !important;
+  background: rgba(235, 235, 235, .04) !important;
+  box-shadow: 0 0 0 3px rgba(235, 235, 235, .05), inset 0 1px 0 rgba(235, 235, 235, .03) !important;
+}
+
+/* Flat liquid controls. Semantic danger/warning/success variants keep their meaning. */
+html.dark body .el-button:not(.is-text):not(.is-link):not(.el-button--danger):not(.el-button--warning):not(.el-button--success) {
+  border-color: rgba(235, 235, 235, .11) !important;
+  color: #dddddd !important;
+  background: rgba(235, 235, 235, .04) !important;
+  box-shadow: 0 4px 13px rgba(0, 0, 0, .1), inset 0 1px 0 rgba(235, 235, 235, .018) !important;
+}
+
+html.dark body .el-button:not(.is-text):not(.is-link):not(.el-button--danger):not(.el-button--warning):not(.el-button--success):hover {
+  border-color: rgba(235, 235, 235, .2) !important;
+  color: #eeeeee !important;
+  background: rgba(235, 235, 235, .075) !important;
+  box-shadow: 0 7px 18px rgba(0, 0, 0, .14), inset 0 1px 0 rgba(235, 235, 235, .028) !important;
+}
+
+html.dark body .el-button--primary:not(.is-text):not(.is-link):not(.is-plain) {
+  border-color: rgba(235, 235, 235, .22) !important;
+  color: #eeeeee !important;
+  background: rgba(235, 235, 235, .095) !important;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, .13), inset 0 1px 0 rgba(235, 235, 235, .035) !important;
+}
+
+html.dark body .el-button--primary:not(.is-text):not(.is-link):not(.is-plain):hover {
+  border-color: rgba(235, 235, 235, .31) !important;
+  background: rgba(235, 235, 235, .14) !important;
+}
+
+/* Segmented navigation shares one neutral sliding-glass language everywhere. */
+html.dark body .el-segmented {
+  border: 1px solid rgba(235, 235, 235, .09) !important;
+  border-radius: 12px !important;
+  background: rgba(5, 5, 5, .2) !important;
+  box-shadow: inset 0 1px 0 rgba(235, 235, 235, .015) !important;
+}
+
+html.dark body .el-segmented__item:hover:not(.is-disabled) { background: rgba(235, 235, 235, .03) !important; }
+html.dark body .el-segmented__item.is-selected { color: #e7e7e7 !important; background: transparent !important; }
+html.dark body .el-segmented__item-selected {
+  border: 1px solid rgba(235, 235, 235, .21) !important;
+  border-radius: 9px !important;
+  background: rgba(235, 235, 235, .075) !important;
+  box-shadow: 0 7px 18px rgba(0, 0, 0, .12), inset 0 1px 0 rgba(235, 235, 235, .04) !important;
+}
+
+/* Floating layers must belong to the same material family. */
+html.dark body :is(.el-dialog, .el-drawer, .el-message-box),
+html.dark :is(.el-popper, .el-select__popper, .el-dropdown__popper, .el-picker__popper) {
+  border-color: rgba(235, 235, 235, .12) !important;
+  background: rgba(20, 20, 20, .91) !important;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .46), inset 0 1px 0 rgba(235, 235, 235, .045) !important;
+  backdrop-filter: blur(32px) saturate(105%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(105%) !important;
+}
+
+html.dark :is(.el-select-dropdown__item, .el-dropdown-menu__item, .el-tabs__item):hover,
+html.dark :is(.el-select-dropdown__item, .el-dropdown-menu__item).is-hovering {
+  color: #e5e5e5 !important;
+  background: rgba(235, 235, 235, .055) !important;
+}
+
+html.dark :is(.el-select-dropdown__item.selected, .el-dropdown-menu__item.is-active, .el-tabs__item.is-active) {
+  color: #eeeeee !important;
+}
+
+html.dark .el-tabs__active-bar { background: #bdbdbd !important; }
+html.dark .el-overlay { background: rgba(0, 0, 0, .58) !important; }
+
+/* Remove historical warm/cool decorative sheen without removing depth. */
+html.dark body .project-card::before,
+html.dark body .episode-card::before,
+html.dark body .film-create .card::before,
+html.dark body .drama-detail .section.card::after,
+html.dark body .studio-page .panel-surface::before {
+  background: linear-gradient(145deg, rgba(235, 235, 235, .026), transparent 62%) !important;
+}
+
+html.dark body :is(.library-item-cover, .asset-no-image, .history-status, .media-placeholder) {
+  background: rgba(5, 5, 5, .26) !important;
+}
+
+html.dark body :is(.muted, .hint, .helper-text, .library-item-desc, .episode-meta, .sidebar-tip) {
+  color: #969696 !important;
+}
+
+/* Route chunks are lazy-loaded after the global bundle. The #app scope gives
+   this material contract enough precedence without coupling it to Vue hashes. */
+html.dark body #app :is(.drama-detail, .film-create, .studio-page, .drama-canvas-page, .free-create-page, .media-library-page) {
+  color: #e7e7e7 !important;
+}
+
+html.dark body #app .drama-detail :is(.episode-card, .library-item, .drama-res-item),
+html.dark body #app .film-create :is(.storyboard-row, .resource-block, .asset-item, .script-sub-block, .script-preview-wrap),
+html.dark body #app .studio-page :is(.subproject-item, .video-list-item, .history-item, .asset-card, .media-asset-card, .audio-reference-chip, .voice-binding-panel),
+html.dark body #app .media-library-page .media-card {
+  border-color: rgba(235, 235, 235, .09) !important;
+  background: rgba(235, 235, 235, .025) !important;
+  box-shadow: inset 0 1px 0 rgba(235, 235, 235, .018) !important;
+}
+
+html.dark body #app .drama-detail :is(.episode-card, .library-item, .drama-res-item):hover,
+html.dark body #app .film-create :is(.storyboard-row, .resource-block, .asset-item):hover,
+html.dark body #app .studio-page :is(.subproject-item, .video-list-item, .history-item, .asset-card, .media-asset-card):hover,
+html.dark body #app .media-library-page .media-card:hover {
+  border-color: rgba(235, 235, 235, .17) !important;
+  background: rgba(235, 235, 235, .05) !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .17), inset 0 1px 0 rgba(235, 235, 235, .032) !important;
+}
+
+/*
+ * The first resource card sits exactly on the scrollport's top edge. Its
+ * translateY hover motion and upper shadow were therefore clipped and looked
+ * as if the toolbar covered the card. Pull the scrollport upward, then restore
+ * the card's original visual position with equal inner padding.
+ */
+html.dark body #app :is(.drama-detail .library-list, .film-create .library-dialog .library-list) {
+  position: relative;
+  z-index: 1;
+  margin-top: -8px !important;
+  padding-top: 8px !important;
+}
+
+html.dark body #app :is(.drama-detail, .film-create, .studio-page, .drama-canvas-page, .free-create-page, .media-library-page)
+  :is(.el-input__wrapper, .el-select__wrapper, .el-textarea__inner, .el-input-number, .el-date-editor, .omni-at-editor) {
+  border-color: rgba(235, 235, 235, .095) !important;
+  background: rgba(5, 5, 5, .2) !important;
+  box-shadow: inset 0 1px 0 rgba(235, 235, 235, .015) !important;
+}
+
+html.dark body #app :is(.drama-detail, .film-create, .studio-page, .drama-canvas-page, .free-create-page, .media-library-page)
+  :is(.el-input__wrapper, .el-select__wrapper, .el-textarea__inner, .el-input-number, .el-date-editor, .omni-at-editor):hover {
+  border-color: rgba(235, 235, 235, .17) !important;
+  background: rgba(235, 235, 235, .03) !important;
+}
+
+html.dark body #app :is(.drama-detail, .film-create, .studio-page, .drama-canvas-page, .free-create-page, .media-library-page)
+  :is(.el-input__wrapper.is-focus, .el-select__wrapper.is-focused, .el-textarea__inner:focus, .el-textarea__inner:focus-visible, .el-input-number:focus-within, .el-date-editor:focus-within, .omni-at-editor:focus, .omni-at-editor:focus-visible) {
+  border-color: rgba(235, 235, 235, .3) !important;
+  background: rgba(235, 235, 235, .04) !important;
+  box-shadow: 0 0 0 3px rgba(235, 235, 235, .05), inset 0 1px 0 rgba(235, 235, 235, .03) !important;
+}
+
+html.dark body #app :is(.drama-detail, .film-create, .studio-page, .drama-canvas-page, .free-create-page, .media-library-page)
+  .el-button:not(.el-button--danger):not(.el-button--warning):not(.el-button--success) {
+  color: #dddddd !important;
+}
+
+html.dark body #app :is(.drama-detail, .film-create, .studio-page, .drama-canvas-page, .free-create-page, .media-library-page)
+  :is(h1, h2, h3, h4, .section-title, .episode-title, .library-item-name, .nav-sidebar-title) {
+  color: #e7e7e7 !important;
+}
+
+html.dark body #app :is(.drama-detail, .film-create, .studio-page, .drama-canvas-page, .free-create-page, .media-library-page)
+  :is(.muted, .hint, .helper-text, .library-item-desc, .episode-meta, .sidebar-tip, .section-subtitle) {
+  color: #969696 !important;
+}
+
+html.dark body #app .studio-page .el-segmented {
+  color: #a7a7a7 !important;
+  border-color: rgba(235, 235, 235, .09) !important;
+  background: rgba(5, 5, 5, .2) !important;
+  box-shadow: inset 0 1px 0 rgba(235, 235, 235, .015) !important;
+}
+
+html.dark body #app .studio-page .el-segmented__item {
+  color: #a7a7a7 !important;
+}
+
+html.dark body #app .studio-page .el-segmented__item:hover:not(.is-disabled) {
+  background: rgba(235, 235, 235, .03) !important;
+}
+
+html.dark body #app .studio-page .el-segmented__item.is-selected {
+  color: #e7e7e7 !important;
+  background: transparent !important;
+}
+
+html.dark body #app .studio-page .el-segmented__item-selected {
+  color: #e7e7e7 !important;
+  border-color: rgba(235, 235, 235, .21) !important;
+  background: rgba(235, 235, 235, .075) !important;
+  box-shadow: 0 7px 18px rgba(0, 0, 0, .12), inset 0 1px 0 rgba(235, 235, 235, .04) !important;
+}
+
+/* AI configuration exists both as a route and a teleported global dialog. */
+html.dark body #app .ai-config,
+html.dark body .global-ai-config-dialog .el-dialog {
+  color: #e7e7e7 !important;
+  border-color: rgba(235, 235, 235, .1) !important;
+  background: linear-gradient(145deg, rgba(235, 235, 235, .024), transparent 54%), rgba(18, 18, 18, .54) !important;
+  box-shadow: 0 18px 52px rgba(0, 0, 0, .25), inset 0 1px 0 rgba(235, 235, 235, .035) !important;
+  backdrop-filter: blur(28px) saturate(105%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(105%) !important;
+}
+
+html.dark body #app .ai-config :is(.el-tabs__item, .el-button),
+html.dark body .global-ai-config-dialog :is(.el-tabs__item, .el-button) {
+  color: #dddddd !important;
+}
+
+html.dark body #app .ai-config :is(.el-input__wrapper, .el-select__wrapper, .el-textarea__inner, .el-input-number),
+html.dark body .global-ai-config-dialog :is(.el-input__wrapper, .el-select__wrapper, .el-textarea__inner, .el-input-number) {
+  border-color: rgba(235, 235, 235, .095) !important;
+  background: rgba(5, 5, 5, .2) !important;
+  box-shadow: inset 0 1px 0 rgba(235, 235, 235, .015) !important;
+}
+
+html.dark body #app .ai-config :is(.el-input__wrapper, .el-select__wrapper, .el-textarea__inner, .el-input-number):hover,
+html.dark body .global-ai-config-dialog :is(.el-input__wrapper, .el-select__wrapper, .el-textarea__inner, .el-input-number):hover {
+  border-color: rgba(235, 235, 235, .17) !important;
+  background: rgba(235, 235, 235, .03) !important;
+}
+
+html.dark body #app .ai-config :is(.el-input__wrapper.is-focus, .el-select__wrapper.is-focused, .el-textarea__inner:focus, .el-input-number:focus-within),
+html.dark body .global-ai-config-dialog :is(.el-input__wrapper.is-focus, .el-select__wrapper.is-focused, .el-textarea__inner:focus, .el-input-number:focus-within) {
+  border-color: rgba(235, 235, 235, .3) !important;
+  background: rgba(235, 235, 235, .04) !important;
+  box-shadow: 0 0 0 3px rgba(235, 235, 235, .05), inset 0 1px 0 rgba(235, 235, 235, .03) !important;
+}
+
+html.dark body :is(#app .ai-config, .global-ai-config-dialog) :is(
+  .one-key-section,
+  .default-tip,
+  .endpoint-preview-box,
+  .gs-tip-box,
+  .protocol-help .ph-body pre,
+  code,
+  .ep-url
+) {
+  color: #c7c7c7 !important;
+  border-color: rgba(235, 235, 235, .09) !important;
+  background: rgba(235, 235, 235, .03) !important;
+}
+
+html.dark body :is(#app .ai-config, .global-ai-config-dialog) :is(
+  .type-badge,
+  .ph-tag,
+  .ep-auto-badge
+) {
+  color: #cfcfcf !important;
+  border-color: rgba(235, 235, 235, .12) !important;
+  background: rgba(235, 235, 235, .045) !important;
+}
+
+html.dark body :is(#app .ai-config, .global-ai-config-dialog) :is(
+  .one-key-tip,
+  .field-tip,
+  .one-key-note,
+  .no-default,
+  .ph-section-title,
+  .ep-label,
+  .ep-tip,
+  .gs-desc,
+  .gs-unit,
+  .gs-tip-list,
+  .gs-tip-note
+) {
+  color: #999 !important;
+}
+
+html.dark body :is(#app .ai-config, .global-ai-config-dialog) :is(
+  .one-key-section-title,
+  .protocol-help .ph-body,
+  .ep-preview-header,
+  .gs-section-title,
+  .gs-label,
+  .gs-tip-title
+) {
+  color: #dedede !important;
+}
+
+html.dark body :is(#app .ai-config, .global-ai-config-dialog) :is(.el-table, .el-table__inner-wrapper, .el-table tr, .el-table th.el-table__cell, .el-table td.el-table__cell) {
+  border-color: rgba(235, 235, 235, .07) !important;
+  background: transparent !important;
+}
+
+html.dark body :is(#app .ai-config, .global-ai-config-dialog) .el-table th.el-table__cell {
+  color: #b5b5b5 !important;
+  background: rgba(235, 235, 235, .035) !important;
+}
+
+html.dark body :is(#app .ai-config, .global-ai-config-dialog) .el-table__body tr:hover > td.el-table__cell {
+  background: rgba(235, 235, 235, .035) !important;
+}
+
+/* macOS/Electron：让原生交通灯进入贯穿全站的顶部导航栏。 */
+html.cinegen-desktop .app-top-header {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+html.cinegen-desktop[data-desktop-shell='mac'] .app-top-header__inner {
+  /* 原生交通灯约占据 x=18—70，额外留出 22px 呼吸空间。 */
+  padding-left: 92px !important;
+}
+
+html.cinegen-desktop .app-top-header :is(
+  a,
+  button,
+  input,
+  textarea,
+  select,
+  [role='button'],
+  .el-button,
+  .el-input,
+  .el-select,
+  .el-segmented,
+  .el-dropdown,
+  .el-switch
+) {
+  -webkit-app-region: no-drag;
+}
+
+/*
+ * Dialog safe area: the persistent navigation is also the macOS drag region.
+ * Centre dialogs inside the space below it, with a little extra bottom inset so
+ * the visual centre sits slightly above the viewport centre. This keeps every
+ * title and close button clear of both the navigation and the traffic lights.
+ */
+html.dark body .el-overlay-dialog {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--work-header, 68px) + 16px) 24px 100px;
+  overflow: auto;
+}
+
+html.dark body .el-overlay-dialog > .el-dialog {
+  max-height: calc(100dvh - var(--work-header, 68px) - 116px) !important;
+  margin: 0 auto !important;
+}
+
+html.dark body .el-overlay-dialog > .global-ai-config-dialog.el-dialog {
+  height: min(790px, calc(100dvh - var(--work-header, 68px) - 116px));
+  min-height: 0;
+}
+
+html.dark body .el-overlay-message-box {
+  box-sizing: border-box;
+  padding: calc(var(--work-header, 68px) + 16px) 24px 100px;
+}
+
+/*
+ * Dialog actions belong to the dialog glass itself. Historical workflow CSS
+ * added a lightly tinted fill here, which reads as a separate solid strip on
+ * every dialog and message box. Keep only the subtle divider and let the
+ * parent glass/background pass through continuously.
+ */
+html.dark body :is(.el-dialog__footer, .el-message-box__btns) {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+/* Cohesive overlay motion for centered and trigger-anchored surfaces. */
+.dialog-fade-enter-active { animation: cgp-overlay-in var(--motion-standard) var(--motion-ease-out) both !important; }
+.dialog-fade-leave-active { animation: cgp-overlay-out 180ms var(--motion-ease-out) both !important; }
+.dialog-fade-enter-active .el-overlay-dialog,
+.dialog-fade-leave-active .el-overlay-dialog { animation: none !important; }
+.dialog-fade-enter-active .el-dialog { animation: cgp-dialog-in 240ms var(--motion-ease-out) both; transform-origin: center; }
+.dialog-fade-leave-active .el-dialog { animation: cgp-dialog-out 180ms var(--motion-ease-out) both; transform-origin: center; }
+
+.el-zoom-in-center-enter-active,
+.el-zoom-in-center-leave-active,
+.el-zoom-in-top-enter-active,
+.el-zoom-in-top-leave-active,
+.el-zoom-in-bottom-enter-active,
+.el-zoom-in-bottom-leave-active,
+.el-zoom-in-left-enter-active,
+.el-zoom-in-left-leave-active {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 180ms var(--motion-ease-out), transform 180ms var(--motion-ease-out) !important;
+}
+.el-zoom-in-center-enter-from,
+.el-zoom-in-center-leave-to,
+.el-zoom-in-top-enter-from,
+.el-zoom-in-top-leave-to,
+.el-zoom-in-bottom-enter-from,
+.el-zoom-in-bottom-leave-to,
+.el-zoom-in-left-enter-from,
+.el-zoom-in-left-leave-to { opacity: 0; transform: scale(.97); }
+
+.el-popper[data-popper-placement^='top'] { transform-origin: center bottom; }
+.el-popper[data-popper-placement^='bottom'] { transform-origin: center top; }
+.el-popper[data-popper-placement^='left'] { transform-origin: right center; }
+.el-popper[data-popper-placement^='right'] { transform-origin: left center; }
+
+@keyframes cgp-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cgp-overlay-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes cgp-dialog-in { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: scale(1); } }
+@keyframes cgp-dialog-out { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(.97); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog-fade-enter-active,
+  .dialog-fade-leave-active { animation-duration: var(--motion-fast) !important; }
+  .dialog-fade-enter-active .el-dialog,
+  .dialog-fade-leave-active .el-dialog { animation: none !important; }
+  .el-zoom-in-center-enter-active,
+  .el-zoom-in-center-leave-active,
+  .el-zoom-in-top-enter-active,
+  .el-zoom-in-top-leave-active,
+  .el-zoom-in-bottom-enter-active,
+  .el-zoom-in-bottom-leave-active,
+  .el-zoom-in-left-enter-active,
+  .el-zoom-in-left-leave-active { transform: none; transition: opacity var(--motion-fast) var(--motion-ease-out) !important; }
+  .film-create :is(.atp-spin-dot, .atp-item-dot, .pipeline-dot-pulse, .sb-dot-bounce, .spin, .el-icon.is-loading) {
+    animation: none !important;
+    transform: none !important;
+  }
+}

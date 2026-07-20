@@ -1,9 +1,19 @@
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-// 显式固定 userData 目录，使开发模式与打包 exe 路径完全一致，防止 productName 变更导致路径漂移
-const USERDATA_DIR = path.join(app.getPath('appData'), 'localminidrama-desktop');
+// Windows 会把系统“动画效果”设置映射到 prefers-reduced-motion。
+// CineGen 桌面版的页面切换、弹窗与滑块都属于产品交互的一部分，因此在创建
+// Chromium 进程前显式保持完整动效。网页版仍继续尊重浏览器/系统的无障碍设置。
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('force-prefers-no-reduced-motion');
+}
+
+// CineGen 使用全新的稳定数据目录。不要迁移 LocalMiniDrama 的测试数据或配置。
+// CINEGEN_USER_DATA_DIR 仅用于发布冒烟测试和受控运维；普通启动仍使用系统标准目录。
+const USERDATA_DIR = process.env.CINEGEN_USER_DATA_DIR
+  ? path.resolve(process.env.CINEGEN_USER_DATA_DIR)
+  : path.join(app.getPath('appData'), 'CineGen');
 app.setPath('userData', USERDATA_DIR);
 
 const MAIN_STARTUP_LOG = path.join(USERDATA_DIR, 'main-startup.log');
@@ -25,23 +35,77 @@ process.on('unhandledRejection', (reason) => {
 
 writeMainLog(`main.js loaded packaged=${app.isPackaged} exec=${process.execPath}`);
 
-// 兼容迁移：若旧路径 LocalMiniDrama 有数据而新路径为空，自动迁移
-;(function migrateOldUserData() {
-  const oldPath = path.join(app.getPath('appData'), 'LocalMiniDrama');
-  if (fs.existsSync(oldPath) && !fs.existsSync(USERDATA_DIR)) {
-    try {
-      fs.renameSync(oldPath, USERDATA_DIR);
-    } catch (e) {
-      // rename 跨驱动器时会失败，此时静默忽略，用户数据仍可手动迁移
-    }
-  }
-})();
-
 const BACKEND_APP_PATH = path.join(__dirname, 'backend-app');
 const BACKEND_NODE_PATH = path.join(__dirname, '..', 'backend-node');
 const DEFAULT_PORT = 5679;
 
 let serverInstance = null;
+let mainWindow = null;
+let statusTray = null;
+let backendPort = null;
+const WINDOW_CONTROL_CHANNEL = 'cinegen:window-control';
+const WINDOW_STATE_CHANNEL = 'cinegen:window-state';
+const APPEARANCE_GET_CHANNEL = 'cinegen:appearance-get';
+const APPEARANCE_SET_CHANNEL = 'cinegen:appearance-set';
+const APPEARANCE_FILE = path.join(USERDATA_DIR, 'appearance.json');
+
+function getWindowState(win) {
+  return {
+    isMaximized: Boolean(win && !win.isDestroyed() && win.isMaximized()),
+  };
+}
+
+// 只暴露固定动作，不允许渲染进程发送任意 Electron IPC。
+ipcMain.handle(WINDOW_CONTROL_CHANNEL, (event, action) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) return { isMaximized: false };
+
+  switch (action) {
+    case 'minimize':
+      win.minimize();
+      break;
+    case 'toggle-maximize':
+      if (win.isMaximized()) win.unmaximize();
+      else win.maximize();
+      break;
+    case 'close':
+      win.close();
+      break;
+    case 'get-state':
+      break;
+    default:
+      throw new Error(`Unsupported window action: ${String(action)}`);
+  }
+
+  return getWindowState(win);
+});
+
+// 页面由本地后端端口提供；端口变化会形成不同的 localStorage origin。
+// 因此外观偏好由主进程写入固定 userData，确保重启和端口回退后仍能恢复。
+ipcMain.handle(APPEARANCE_GET_CHANNEL, () => {
+  try {
+    if (!fs.existsSync(APPEARANCE_FILE)) return null;
+    const parsed = JSON.parse(fs.readFileSync(APPEARANCE_FILE, 'utf8'));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch (error) {
+    writeMainLog(`appearance read failed: ${error.message}`);
+    return null;
+  }
+});
+
+ipcMain.handle(APPEARANCE_SET_CHANNEL, (_event, payload) => {
+  try {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false;
+    const serialized = JSON.stringify(payload);
+    if (serialized.length > 8192) return false;
+    if (!fs.existsSync(USERDATA_DIR)) fs.mkdirSync(USERDATA_DIR, { recursive: true });
+    fs.writeFileSync(APPEARANCE_FILE, `${serialized}\n`, 'utf8');
+    return true;
+  } catch (error) {
+    writeMainLog(`appearance write failed: ${error.message}`);
+    return false;
+  }
+});
 
 /** 开发模式用 backend-node（改代码即生效）；打包后用 backend-app */
 function getBackendModulePath() {
@@ -175,14 +239,83 @@ function findFreePort(preferredPort) {
   });
 }
 
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  if (process.platform === 'darwin') app.dock.show();
+}
+
+function createStatusTray(port) {
+  if (process.platform !== 'darwin' || statusTray) return;
+
+  const iconPath = path.join(__dirname, 'assets', 'cinegen-trayTemplate.png');
+  const icon = nativeImage.createFromPath(iconPath);
+  if (icon.isEmpty()) {
+    writeMainLog(`status tray icon missing or invalid: ${iconPath}`);
+    return;
+  }
+  icon.setTemplateImage(true);
+
+  statusTray = new Tray(icon);
+  statusTray.setToolTip('CineGen 正在运行');
+  statusTray.setContextMenu(Menu.buildFromTemplate([
+    {
+      label: '显示 CineGen',
+      click: showMainWindow,
+    },
+    {
+      label: `运行中 · 本地服务 127.0.0.1:${port}`,
+      enabled: false,
+    },
+    { type: 'separator' },
+    {
+      label: '完全退出 CineGen',
+      click: () => app.quit(),
+    },
+  ]));
+  statusTray.on('click', showMainWindow);
+  writeMainLog(`status tray ready port=${port}`);
+}
+
 function createWindow(port) {
   Menu.setApplicationMenu(null);
+  const isMac = process.platform === 'darwin';
+  const isWindows = process.platform === 'win32';
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
-    webPreferences: { nodeIntegration: false, contextIsolation: true },
+    minWidth: 1100,
+    minHeight: 700,
+    // macOS 保留原生交通灯，但让网页内容延伸到窗口顶部，和应用导航栏融为一体。
+    ...(isMac
+      ? {
+          titleBarStyle: 'hiddenInset',
+          trafficLightPosition: { x: 18, y: 26 },
+        }
+      : {}),
+    // Windows 使用网页导航栏作为唯一标题栏；窗口仍保留系统缩放与边缘拖拽能力。
+    ...(isWindows ? { frame: false, autoHideMenuBar: true } : {}),
+    backgroundColor: '#171717',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+    },
     show: false,
   });
+  mainWindow = win;
+
+  const publishWindowState = () => {
+    if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+      win.webContents.send(WINDOW_STATE_CHANNEL, getWindowState(win));
+    }
+  };
+  win.on('maximize', publishWindowState);
+  win.on('unmaximize', publishWindowState);
+  win.on('restore', publishWindowState);
+  win.webContents.on('did-finish-load', publishWindowState);
   win.once('ready-to-show', () => {
     win.show();
     writeMainLog('window ready-to-show');
@@ -197,9 +330,14 @@ function createWindow(port) {
   win.webContents.on('did-fail-load', (_e, code, desc, url) => {
     writeMainLog(`did-fail-load code=${code} desc=${desc} url=${url}`);
   });
-  writeMainLog(`createWindow loadURL http://127.0.0.1:${port}`);
-  win.loadURL(`http://127.0.0.1:${port}`);
-  win.on('closed', () => app.quit());
+  const rendererUrl = new URL(`http://127.0.0.1:${port}`);
+  rendererUrl.searchParams.set('desktop', isMac ? 'mac' : isWindows ? 'windows' : 'electron');
+  writeMainLog(`createWindow loadURL ${rendererUrl.toString()}`);
+  win.loadURL(rendererUrl.toString());
+  win.on('closed', () => {
+    mainWindow = null;
+    app.quit();
+  });
   if (process.env.LOCALMINIDRAMA_DEVTOOLS === '1') {
     win.webContents.openDevTools();
   }
@@ -211,6 +349,7 @@ async function startBackend() {
   ensureBackendCwd(backendCwd);
   ensureFfmpeg(backendCwd);
   process.env.WEB_DIST_PATH = getWebDistPath();
+  process.env.CINEGEN_APP_VERSION = app.getVersion();
   if (app.isPackaged) {
     process.env.LOG_FILE = path.join(backendCwd, 'logs', 'app.log');
     process.env.EXAMPLE_DRAMA_PATH = path.join(process.resourcesPath, 'example_drama');
@@ -260,19 +399,28 @@ app.whenReady().then(async () => {
     console.error('Failed to start backend', err);
     const { dialog } = require('electron');
     dialog.showErrorBox(
-      '本地短剧助手启动失败',
+      'CineGen 启动失败',
       `后端服务未能启动，请查看日志：\n${MAIN_STARTUP_LOG}\n\n${stack}`
     );
     app.quit();
     return;
   }
   // startBackend 的 Promise 在 listen 回调中 resolve，服务器此时已就绪，直接建窗口
+  backendPort = port;
   createWindow(port);
+  createStatusTray(port);
 });
 
+app.on('activate', showMainWindow);
+
 app.on('before-quit', () => {
+  if (statusTray) {
+    statusTray.destroy();
+    statusTray = null;
+  }
   if (serverInstance) {
     serverInstance.close();
     serverInstance = null;
   }
+  backendPort = null;
 });

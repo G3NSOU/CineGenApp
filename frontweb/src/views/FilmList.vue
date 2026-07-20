@@ -1,93 +1,34 @@
 <template>
   <div class="film-list">
-    <header class="header">
-      <div class="header-inner">
-        <h1 class="logo">
-          <span class="logo-main">本地短剧助手</span>
-          <span class="logo-sub">LocalMiniDrama</span>
-        </h1>
-        <!-- 公共资源库（左侧，靛紫调） -->
-        <div class="header-library">
-          <el-button class="btn-library" @click="showCharLibrary = true">
-            <el-icon><User /></el-icon>素材角色
-          </el-button>
-          <el-button class="btn-library" @click="showSceneLibrary = true">
-            <el-icon><PictureFilled /></el-icon>素材场景
-          </el-button>
-          <el-button class="btn-library" @click="showPropLibrary = true">
-            <el-icon><Box /></el-icon>素材道具
-          </el-button>
-        </div>
-        <!-- 右侧操作区 -->
-        <div class="header-actions">
-          <!-- 暂时隐藏，功能待完善 -->
-          <!-- <el-button class="btn-library" title="自由创作" @click="$router.push('/free-create')">
-            <el-icon><MagicStick /></el-icon>自由创作
-          </el-button>
-          <el-button class="btn-library" title="媒体素材库" @click="$router.push('/media-library')">
-            <el-icon><Files /></el-icon>素材库
-          </el-button> -->
-          <el-button v-if="!vendorLockEnabled" class="btn-wechat" title="扫码联系作者" @click="showWechat = true">
-            <el-icon><ChatDotSquare /></el-icon>微信我
-          </el-button>
-          <el-button class="btn-theme" :title="isDark ? '切换到浅色模式' : '切换到暗色模式'" @click="toggleTheme">
-            <el-icon><Sunny v-if="isDark" /><Moon v-else /></el-icon>
-            {{ isDark ? '浅色' : '暗色' }}
-          </el-button>
-          <el-button class="btn-settings" @click="showAiConfigDialog = true">
-            <el-icon><Setting /></el-icon>AI配置
-          </el-button>
-          <el-button class="btn-import" :loading="importing" @click="triggerImport">
-            <el-icon><Upload /></el-icon>导入项目
-          </el-button>
-          <input ref="importFileInput" type="file" accept=".zip" style="display:none" @change="onImportFile" />
-          <el-button type="primary" class="btn-new" @click="goNewProject">
-            <el-icon><Plus /></el-icon>新建项目
-          </el-button>
-        </div>
-      </div>
-    </header>
+    <input ref="importFileInput" type="file" accept=".zip" hidden @change="onImportFile" />
 
     <main class="main">
       <div v-loading="loading" class="projects-wrap">
         <div class="project-grid">
-          <!-- 操作卡片：始终作为第一个格子 -->
-          <div class="project-card action-card">
+          <!-- 工作区总览：与项目卡片分层，避免把主要操作伪装成普通项目 -->
+          <section class="project-card action-card" aria-labelledby="workspace-title" style="--card-index: 0">
             <div class="action-card-inner">
-              <h3 class="action-card-title">快速开始</h3>
+              <div class="action-card-copy">
+                <span class="workspace-kicker">WORKSPACE</span>
+                <h2 id="workspace-title" class="action-card-title">项目空间</h2>
+                <p>管理剧本流水线与自由创作项目，所有素材库在顶部统一访问。</p>
+              </div>
               <div class="action-card-buttons">
                 <el-button type="primary" size="large" class="action-btn action-btn-new" @click="goNewProject">
-                  <el-icon><Plus /></el-icon>新建短剧项目
+                  <el-icon><Plus /></el-icon>新建项目
                 </el-button>
                 <el-button size="large" class="action-btn action-btn-import" :loading="importing" @click="triggerImport">
-                  <el-icon><Upload /></el-icon>导入短剧项目
+                  <el-icon><Upload /></el-icon>导入项目
                 </el-button>
               </div>
-              <div v-if="exampleList.length > 0" class="action-card-example">
-                <div class="example-hint">
-                  <el-icon class="example-hint-icon"><QuestionFilled /></el-icon>
-                  <span class="example-hint-text">新手？试试导入示例项目快速体验</span>
-                </div>
-                <div class="example-list">
-                  <el-button
-                    v-for="ex in exampleList"
-                    :key="ex.filename"
-                    size="small"
-                    class="example-btn"
-                    :loading="importingExample === ex.filename"
-                    @click="onImportExample(ex)"
-                  >
-                    <el-icon><FolderOpened /></el-icon>{{ ex.name }}
-                  </el-button>
-                </div>
-              </div>
             </div>
-          </div>
+          </section>
           <div
-            v-for="d in dramas"
+            v-for="(d, index) in dramas"
             :key="d.id"
             class="project-card"
-            @click="openProject(d.id)"
+            :style="{ '--card-index': index + 1 }"
+            @click="openProject(d)"
           >
             <div class="project-card-actions" @click.stop>
               <el-button size="small" circle :icon="Download" title="导出项目" :loading="exportingId === d.id" @click="onExport(d)" />
@@ -98,9 +39,12 @@
               <h3 class="project-title">{{ d.title || '未命名项目' }}</h3>
               <p class="project-desc">{{ d.description || '暂无描述' }}</p>
               <div class="project-badges">
+                <span class="badge badge-workflow" :class="'badge-workflow--' + projectWorkflowMode(d)">
+                  {{ projectWorkflowMode(d) === 'free_studio' ? '自由创作' : '剧集模式' }}
+                </span>
                 <span class="badge badge-status" :class="'badge-status--' + (d.status || 'draft')">{{ formatStatus(d.status) }}</span>
-                <span v-if="d.episodes?.length" class="badge badge-episodes">{{ d.episodes.length }} 集</span>
-                <span v-if="totalStoryboards(d) > 0" class="badge badge-storyboards">{{ totalStoryboards(d) }} 分镜</span>
+                <span v-if="d.episodes?.length" class="badge badge-episodes">{{ d.episodes.length }} {{ projectWorkflowMode(d) === 'free_studio' ? '个子项目' : '集' }}</span>
+                <span v-if="totalStoryboards(d) > 0" class="badge badge-storyboards">{{ totalStoryboards(d) }} {{ projectWorkflowMode(d) === 'free_studio' ? '个视频' : '分镜' }}</span>
                 <span v-if="d.metadata?.aspect_ratio" class="badge badge-ratio">{{ d.metadata.aspect_ratio }}</span>
                 <span v-if="d.style" class="badge badge-style">{{ formatStyle(d.style) }}</span>
                 <span v-if="d.genre" class="badge badge-genre">{{ formatGenre(d.genre) }}</span>
@@ -121,6 +65,18 @@
       @closed="resetNewForm"
     >
       <el-form :model="newForm" label-width="80px" label-position="top">
+        <el-form-item label="工作流模式" required>
+          <el-radio-group v-model="newForm.workflow_mode" class="workflow-mode-options">
+            <el-radio-button value="pipeline">
+              <span class="workflow-option-title">剧集模式</span>
+              <small>剧本、资产、分镜到成片的完整流水线</small>
+            </el-radio-button>
+            <el-radio-button value="free_studio">
+              <span class="workflow-option-title">自由创作</span>
+              <small>项目资产与 Seedance 多参考视频工作台</small>
+            </el-radio-button>
+          </el-radio-group>
+        </el-form-item>
         <el-form-item label="标题" required>
           <el-input v-model="newForm.title" placeholder="输入项目标题" maxlength="100" show-word-limit />
         </el-form-item>
@@ -143,11 +99,6 @@
         <el-button @click="showNewDialog = false">取消</el-button>
         <el-button type="primary" :loading="newSaving" :disabled="!newForm.title?.trim()" @click="submitNew">确定</el-button>
       </template>
-    </el-dialog>
-
-    <!-- AI 配置弹窗 -->
-    <el-dialog v-model="showAiConfigDialog" title="AI 配置" width="90%" destroy-on-close>
-      <AIConfigContent v-if="showAiConfigDialog" />
     </el-dialog>
 
     <!-- 公共角色库 -->
@@ -197,11 +148,39 @@
         <el-form-item label="分类"><el-input v-model="editCharLibraryForm.category" placeholder="可选" /></el-form-item>
         <el-form-item label="描述"><el-input v-model="editCharLibraryForm.description" type="textarea" :rows="3" placeholder="可选" /></el-form-item>
         <el-form-item label="标签"><el-input v-model="editCharLibraryForm.tags" placeholder="可选，逗号分隔" /></el-form-item>
+        <el-form-item label="角色音色">
+          <el-select v-model="editCharLibraryForm.voice_library_id" clearable filterable placeholder="未绑定（测试功能）" style="width:100%">
+            <el-option v-for="audio in audioLibraryList" :key="audio.id" :label="audio.name" :value="audio.id" />
+          </el-select>
+          <div class="experimental-hint">实验功能：在自由创作中引用该角色时可自动带入绑定音色。</div>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showEditCharLibrary = false">取消</el-button>
         <el-button type="primary" :loading="editCharLibrarySaving" @click="submitEditCharLibrary">保存</el-button>
       </template>
+    </el-dialog>
+
+    <!-- 公共音频库 -->
+    <el-dialog v-model="showAudioLibrary" title="素材库 · 音频" width="760px" class="library-dialog" @open="loadAudioLibraryList">
+      <div class="library-toolbar media-toolbar">
+        <el-input v-model="audioLibraryKeyword" placeholder="搜索音频" clearable style="width:200px" @input="debouncedLoadAudioLibrary" />
+        <el-button type="primary" @click="audioFileRef?.click()"><el-icon><Upload /></el-icon>添加音频</el-button>
+        <input ref="audioFileRef" type="file" accept="audio/*,.mp3,.wav,.m4a,.ogg" style="display:none" @change="uploadMediaFile" />
+      </div>
+      <div v-loading="audioLibraryLoading" class="library-list media-list">
+        <div v-for="item in audioLibraryList" :key="item.id" class="library-item media-item">
+          <div class="media-icon"><el-icon><Headset /></el-icon></div>
+          <div class="library-item-info">
+            <div class="library-item-name">{{ item.name }}</div>
+            <div class="library-item-desc">{{ item.category || 'audio' }} · {{ item.description || '无描述' }}</div>
+            <audio :src="assetAudioUrl(item)" controls preload="none" />
+          </div>
+          <el-button size="small" type="danger" plain @click="deleteMediaItem(item)">删除</el-button>
+        </div>
+        <div v-if="!audioLibraryLoading && !audioLibraryList.length" class="library-empty">暂无音频素材，可上传配乐、音效、对白或参考音频</div>
+      </div>
+      <template #footer><el-button @click="showAudioLibrary = false">关闭</el-button></template>
     </el-dialog>
 
     <!-- 公共场景库 -->
@@ -313,14 +292,6 @@
       </template>
     </el-dialog>
 
-    <!-- 微信二维码 -->
-    <el-dialog v-if="!vendorLockEnabled" v-model="showWechat" title="微信联系作者" width="320px" align-center>
-      <div style="text-align:center;padding:8px 0 4px">
-        <img src="/wx.jpg" alt="微信二维码" style="width:240px;height:240px;object-fit:contain;border-radius:8px;" />
-        <p style="margin:12px 0 0;font-size:13px;color:var(--text-secondary,#a1a1aa);">扫码添加微信，欢迎交流</p>
-      </div>
-    </el-dialog>
-
     <!-- 图片放大预览 -->
     <Teleport to="body">
       <div v-if="previewImageUrl" class="image-preview-overlay" @click="previewImageUrl = null">
@@ -356,20 +327,17 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Edit, Delete, Setting, Plus, User, PictureFilled, Box, Sunny, Moon, ChatDotSquare, Download, Upload, QuestionFilled, FolderOpened, MagicStick, Files } from '@element-plus/icons-vue'
-import { useTheme } from '@/composables/useTheme'
+import { Edit, Delete, Plus, User, PictureFilled, Box, Download, Upload, Headset } from '@element-plus/icons-vue'
 import { dramaAPI } from '@/api/drama'
 import { characterLibraryAPI } from '@/api/characterLibrary'
 import { sceneLibraryAPI } from '@/api/sceneLibrary'
 import { propLibraryAPI } from '@/api/propLibrary'
-import AIConfigContent from '@/components/AIConfigContent.vue'
+import { audioLibraryAPI, voiceBindingAPI } from '@/api/mediaLibrary'
 import { uploadAPI } from '@/api/upload'
-import { aiAPI } from '@/api/ai'
 import { imagesAPI } from '@/api/images'
 import { taskAPI } from '@/api/task'
 
 const router = useRouter()
-const { isDark, toggle: toggleTheme } = useTheme()
 
 // 库编辑图片 – 文件输入 refs
 const charLibFileRef  = ref(null)
@@ -431,10 +399,6 @@ const loading = ref(false)
 const dramas = ref([])
 const total = ref(0)
 
-const showAiConfigDialog = ref(false)
-const showWechat = ref(false)
-const vendorLockEnabled = ref(false)
-
 // 图片预览
 const previewImageUrl = ref(null)
 function assetImageUrl(item) {
@@ -446,6 +410,60 @@ function assetImageUrl(item) {
 }
 function openImagePreview(url) {
   if (url) previewImageUrl.value = url
+}
+function assetAudioUrl(item) {
+  if (!item) return ''
+  if (item.local_path) return '/static/' + String(item.local_path).replace(/^\//, '')
+  return item.audio_url || ''
+}
+
+// 公共音频库：普通参考音频与角色声音使用同一份素材。
+const showAudioLibrary = ref(false)
+const audioFileRef = ref(null)
+const audioLibraryList = ref([])
+const audioLibraryLoading = ref(false)
+const audioLibraryKeyword = ref('')
+let audioKeywordTimer = null
+
+async function loadAudioLibraryList() {
+  audioLibraryLoading.value = true
+  try {
+    const res = await audioLibraryAPI.list({ page: 1, page_size: 100, keyword: audioLibraryKeyword.value || undefined, global: 1 })
+    audioLibraryList.value = res?.items ?? []
+  } catch { audioLibraryList.value = [] } finally { audioLibraryLoading.value = false }
+}
+function debouncedLoadAudioLibrary() {
+  clearTimeout(audioKeywordTimer)
+  audioKeywordTimer = setTimeout(loadAudioLibraryList, 250)
+}
+async function uploadMediaFile(event) {
+  const file = event.target?.files?.[0]
+  if (event.target) event.target.value = ''
+  if (!file) return
+  audioLibraryLoading.value = true
+  try {
+    const uploaded = await uploadAPI.uploadAudio(file)
+    const data = uploaded?.data ?? uploaded
+    const name = file.name.replace(/\.[^.]+$/, '') || '新音频'
+    const payload = {
+      name,
+      audio_url: data.url,
+      local_path: data.local_path || null,
+      mime_type: data.mime_type || file.type || null,
+    }
+    await audioLibraryAPI.create({ ...payload, category: 'audio' })
+    await loadAudioLibraryList()
+    ElMessage.success('音频素材已添加')
+  } catch (e) { ElMessage.error(e.message || '音频上传失败') }
+  finally { audioLibraryLoading.value = false }
+}
+async function deleteMediaItem(item) {
+  try { await ElMessageBox.confirm(`确定删除「${item.name || '未命名'}」吗？`, '删除确认', { type: 'warning' }) } catch { return }
+  try {
+    await audioLibraryAPI.delete(item.id)
+    await loadAudioLibraryList()
+    ElMessage.success('已删除')
+  } catch (e) { ElMessage.error(e.message || '删除失败') }
 }
 
 // 公共角色库
@@ -477,7 +495,8 @@ function debouncedLoadCharLibrary() {
   charLibraryKeywordTimer = setTimeout(() => { charLibraryPage.value = 1; loadCharLibraryList() }, 300)
 }
 function openEditCharLibrary(item) {
-  editCharLibraryForm.value = { id: item.id, name: item.name ?? '', category: item.category ?? '', description: item.description ?? '', tags: item.tags ?? '', image_url: item.image_url ?? '', local_path: item.local_path ?? null, imgUploading: false, imgGenerating: false }
+  editCharLibraryForm.value = { id: item.id, name: item.name ?? '', category: item.category ?? '', description: item.description ?? '', tags: item.tags ?? '', image_url: item.image_url ?? '', local_path: item.local_path ?? null, voice_library_id: item.voice_library_id ?? null, imgUploading: false, imgGenerating: false }
+  if (!audioLibraryList.value.length) loadAudioLibraryList()
   showEditCharLibrary.value = true
 }
 async function submitEditCharLibrary() {
@@ -485,6 +504,7 @@ async function submitEditCharLibrary() {
   editCharLibrarySaving.value = true
   try {
     await characterLibraryAPI.update(editCharLibraryForm.value.id, { name: editCharLibraryForm.value.name, category: editCharLibraryForm.value.category || null, description: editCharLibraryForm.value.description || null, tags: editCharLibraryForm.value.tags || null, image_url: editCharLibraryForm.value.image_url || null, local_path: editCharLibraryForm.value.local_path ?? null })
+    await voiceBindingAPI.bind(editCharLibraryForm.value.id, 'library-character', editCharLibraryForm.value.voice_library_id)
     ElMessage.success('已保存')
     showEditCharLibrary.value = false
     loadCharLibraryList()
@@ -591,34 +611,11 @@ async function onDeletePropLibrary(item) {
 }
 
 const showNewDialog = ref(false)
-const newForm = ref({ title: '', description: '', aspect_ratio: '16:9' })
+const newForm = ref({ title: '', description: '', aspect_ratio: '16:9', workflow_mode: 'pipeline' })
 const newSaving = ref(false)
 const exportingId = ref(null)
 const importing = ref(false)
 const importFileInput = ref(null)
-
-const exampleList = ref([])
-const importingExample = ref(null)
-
-function loadExamples() {
-  dramaAPI.listExamples()
-    .then(res => { exampleList.value = Array.isArray(res) ? res : (res?.data ?? []) })
-    .catch(() => { exampleList.value = [] })
-}
-
-async function onImportExample(ex) {
-  importingExample.value = ex.filename
-  try {
-    const data = await dramaAPI.importExample(ex.filename)
-    ElMessage.success(`示例导入成功：${data?.title || ex.name}`)
-    loadList()
-  } catch (e) {
-    const msg = e.response?.data?.message || e.message || '导入失败'
-    ElMessage.error(msg)
-  } finally {
-    importingExample.value = null
-  }
-}
 
 const showEditDialog = ref(false)
 const editForm = ref({ id: null, title: '', description: '' })
@@ -703,12 +700,18 @@ function totalStoryboards(d) {
   return (d.episodes || []).reduce((sum, ep) => sum + (ep.storyboards?.length || 0), 0)
 }
 
+function projectWorkflowMode(d) {
+  return d?.workflow_mode === 'free_studio' || d?.metadata?.workflow_mode === 'free_studio'
+    ? 'free_studio'
+    : 'pipeline'
+}
+
 function goNewProject() {
   showNewDialog.value = true
 }
 
 function resetNewForm() {
-  newForm.value = { title: '', description: '', aspect_ratio: '16:9' }
+  newForm.value = { title: '', description: '', aspect_ratio: '16:9', workflow_mode: 'pipeline' }
 }
 
 async function submitNew() {
@@ -716,11 +719,20 @@ async function submitNew() {
   if (!title) return
   newSaving.value = true
   try {
-    const drama = await dramaAPI.create({ title, description: newForm.value.description?.trim() || undefined, metadata: { aspect_ratio: newForm.value.aspect_ratio || '16:9' } })
+    const workflowMode = newForm.value.workflow_mode === 'free_studio' ? 'free_studio' : 'pipeline'
+    const drama = await dramaAPI.create({
+      title,
+      description: newForm.value.description?.trim() || undefined,
+      workflow_mode: workflowMode,
+      metadata: {
+        aspect_ratio: newForm.value.aspect_ratio || '16:9',
+        workflow_mode: workflowMode,
+      },
+    })
     showNewDialog.value = false
     ElMessage.success('项目已创建')
     loadList()
-    router.push('/film/' + drama.id)
+    router.push(workflowMode === 'free_studio' ? `/studio/${drama.id}` : `/film/${drama.id}`)
   } catch (e) {
     ElMessage.error(e.message || '创建失败')
   } finally {
@@ -753,8 +765,9 @@ async function submitEdit() {
   }
 }
 
-function openProject(id) {
-  router.push('/drama/' + id)
+function openProject(d) {
+  if (!d?.id) return
+  router.push(projectWorkflowMode(d) === 'free_studio' ? `/studio/${d.id}` : `/drama/${d.id}`)
 }
 
 function onExport(d) {
@@ -823,15 +836,11 @@ async function onDelete(d) {
 
 onMounted(async () => {
   loadList()
-  loadExamples()
-  try {
-    const lock = await aiAPI.getVendorLock()
-    vendorLockEnabled.value = !!lock?.enabled
-  } catch (_) {}
 })
 </script>
 
 <style scoped>
+.workspace-header-actions { display: flex; align-items: center; gap: 8px; }
 .film-list {
   min-height: 100vh;
   background: #08080d;
@@ -864,27 +873,24 @@ onMounted(async () => {
   margin: 0;
   cursor: pointer;
   display: flex;
-  flex-direction: column;
-  gap: 1px;
   line-height: 1;
+  flex: 0 0 auto;
+  overflow: visible;
+  padding-right: 6px;
 }
 .logo-main {
-  font-size: 1.1rem;
+  display: inline-block;
+  padding-right: 0.16em;
+  font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', 'Arial Narrow', sans-serif;
+  font-size: 1.4rem;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  font-style: italic;
+  letter-spacing: 0.035em;
   background: linear-gradient(135deg, #a5b4fc 0%, #c084fc 50%, #f0abfc 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.35));
-}
-.logo-sub {
-  font-size: 0.68rem;
-  font-weight: 400;
-  letter-spacing: 0.02em;
-  color: #6d6d7a;
-  -webkit-text-fill-color: #6d6d7a;
-  filter: none;
 }
 .page-title {
   color: #a1a1aa;
@@ -933,7 +939,7 @@ html.light .btn-library {
   --el-button-hover-bg-color: rgba(148, 163, 184, 0.2);
   --el-button-hover-border-color: rgba(148, 163, 184, 0.5);
   --el-button-hover-text-color: #cbd5e1;
-  transition: all 0.2s;
+  transition: color var(--motion-fast) var(--motion-ease-out), background-color var(--motion-fast) var(--motion-ease-out), border-color var(--motion-fast) var(--motion-ease-out), box-shadow var(--motion-fast) var(--motion-ease-out), transform var(--motion-fast) var(--motion-ease-out);
 }
 html.light .btn-theme {
   --el-button-bg-color: rgba(99, 102, 241, 0.08);
@@ -942,25 +948,6 @@ html.light .btn-theme {
   --el-button-hover-bg-color: rgba(99, 102, 241, 0.15);
   --el-button-hover-border-color: rgba(99, 102, 241, 0.5);
   --el-button-hover-text-color: #4f46e5;
-}
-
-/* 微信我按钮 —— 绿调 */
-.btn-wechat {
-  --el-button-bg-color: rgba(34, 197, 94, 0.1);
-  --el-button-border-color: rgba(34, 197, 94, 0.3);
-  --el-button-text-color: #22c55e;
-  --el-button-hover-bg-color: rgba(34, 197, 94, 0.2);
-  --el-button-hover-border-color: rgba(34, 197, 94, 0.5);
-  --el-button-hover-text-color: #16a34a;
-  transition: all 0.2s;
-}
-html.light .btn-wechat {
-  --el-button-bg-color: rgba(21, 128, 61, 0.08);
-  --el-button-border-color: rgba(21, 128, 61, 0.3);
-  --el-button-text-color: #166534;
-  --el-button-hover-bg-color: rgba(21, 128, 61, 0.14);
-  --el-button-hover-border-color: rgba(21, 128, 61, 0.5);
-  --el-button-hover-text-color: #14532d;
 }
 
 /* AI配置按钮 —— 琥珀调 */
@@ -1037,14 +1024,14 @@ html.light .btn-import {
   position: absolute;
   inset: 0;
   border-radius: 14px;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.04) 0%, transparent 60%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0%, transparent 60%);
   pointer-events: none;
 }
 .project-card:hover {
-  border-color: rgba(99, 102, 241, 0.55);
+  border-color: rgba(255, 255, 255, 0.23);
   background: rgba(28, 28, 36, 0.9);
   transform: translateY(-3px);
-  box-shadow: 0 12px 40px rgba(99, 102, 241, 0.15), 0 0 0 1px rgba(99, 102, 241, 0.1), 0 2px 8px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, .36), 0 0 0 1px rgba(255, 255, 255, .045);
 }
 
 /* 操作卡片 */
@@ -1077,7 +1064,7 @@ html.light .btn-import {
 .action-card-title {
   font-size: 1rem;
   font-weight: 600;
-  color: #a5b4fc;
+  color: #f0f0ed;
   margin: 0;
 }
 .action-card-buttons {
@@ -1093,46 +1080,12 @@ html.light .btn-import {
   --el-button-bg-color: var(--el-color-primary);
 }
 .action-btn-import {
-  --el-button-bg-color: rgba(99, 102, 241, 0.12);
-  --el-button-border-color: rgba(99, 102, 241, 0.35);
-  --el-button-text-color: #a5b4fc;
-  --el-button-hover-bg-color: rgba(99, 102, 241, 0.22);
-  --el-button-hover-border-color: rgba(99, 102, 241, 0.55);
-  --el-button-hover-text-color: #c7d2fe;
-}
-.action-card-example {
-  width: 100%;
-  padding-top: 8px;
-  border-top: 1px solid rgba(99, 102, 241, 0.15);
-}
-.example-hint {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  justify-content: center;
-  margin-bottom: 8px;
-}
-.example-hint-icon {
-  color: #a5b4fc;
-  font-size: 15px;
-}
-.example-hint-text {
-  font-size: 0.8rem;
-  color: #71717a;
-}
-.example-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-}
-.example-btn {
-  --el-button-bg-color: rgba(34, 197, 94, 0.1);
-  --el-button-border-color: rgba(34, 197, 94, 0.3);
-  --el-button-text-color: #4ade80;
-  --el-button-hover-bg-color: rgba(34, 197, 94, 0.2);
-  --el-button-hover-border-color: rgba(34, 197, 94, 0.5);
-  --el-button-hover-text-color: #22c55e;
+  --el-button-bg-color: rgba(255,255,255,.055);
+  --el-button-border-color: rgba(255,255,255,.14);
+  --el-button-text-color: #d8d8d5;
+  --el-button-hover-bg-color: rgba(255,255,255,.1);
+  --el-button-hover-border-color: rgba(255,255,255,.23);
+  --el-button-hover-text-color: #fff;
 }
 .project-card-body {
   padding-right: 56px;
@@ -1176,6 +1129,55 @@ html.light .btn-import {
   color: #a1a1aa;
   border: 1px solid rgba(113, 113, 122, 0.3);
 }
+.badge-workflow {
+  position: relative;
+  padding: 3px 10px;
+  font-weight: 720;
+  letter-spacing: .025em;
+  color: #e4e6e4 !important;
+  border-color: rgba(235, 238, 235, .24) !important;
+  background: rgba(235, 238, 235, .09) !important;
+  box-shadow:
+    0 0 16px rgba(235, 238, 235, .12),
+    inset 0 1px 0 rgba(245, 247, 245, .09) !important;
+}
+.badge-workflow--pipeline {
+  background: rgba(235, 238, 235, .105) !important;
+}
+.badge-workflow--free_studio {
+  background: rgba(235, 238, 235, .075) !important;
+}
+.workflow-mode-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  gap: 10px;
+}
+.workflow-mode-options :deep(.el-radio-button) {
+  width: 100%;
+}
+.workflow-mode-options :deep(.el-radio-button__inner) {
+  width: 100%;
+  min-height: 78px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  white-space: normal;
+  text-align: left;
+  border: 1px solid rgba(113, 113, 122, 0.34);
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+.workflow-option-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+.workflow-mode-options small {
+  color: #a1a1aa;
+  line-height: 1.35;
+}
 .badge-status--published {
   background: rgba(34, 197, 94, 0.12);
   color: #4ade80;
@@ -1217,6 +1219,31 @@ html.light .btn-import {
   color: #fb923c;
   border: 1px solid rgba(249, 115, 22, 0.25);
 }
+/* 首页标签只用明度和极低饱和度区分，避免重新形成彩虹式主题。 */
+.badge-workflow--pipeline,
+.badge-status--archived,
+.badge-style {
+  color: #d4d4d1;
+  border-color: rgba(255,255,255,.15);
+  background: rgba(255,255,255,.065);
+}
+.badge-workflow--free_studio,
+.badge-storyboards {
+  color: #bdcbc4;
+  border-color: rgba(151,177,163,.18);
+  background: rgba(95,126,110,.09);
+}
+.badge-episodes {
+  color: #c1c8c8;
+  border-color: rgba(165,177,177,.17);
+  background: rgba(121,137,137,.08);
+}
+.badge-ratio,
+.badge-genre {
+  color: #cfc2b5;
+  border-color: rgba(178,151,126,.18);
+  background: rgba(126,95,71,.09);
+}
 .project-meta {
   font-size: 0.75rem;
   color: #71717a;
@@ -1247,6 +1274,13 @@ html.light .btn-import {
 .lib-img-empty { color: var(--text-faint, #52525b); font-size: 26px; }
 .lib-img-btns { display: flex; flex-direction: column; gap: 8px; }
 .library-toolbar { margin-bottom: 12px; }
+.media-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.media-list { display: flex; flex-direction: column; gap: 10px; }
+.media-item { min-height: 86px; align-items: center; }
+.media-item audio { width: min(360px, 100%); height: 34px; margin-top: 7px; }
+.media-icon { width: 54px; height: 54px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 14px; color: #a5b4fc; background: rgba(99,102,241,.14); font-size: 24px; }
+.media-icon.voice { color: #f0abfc; background: rgba(192,132,252,.14); }
+.experimental-hint { margin-top: 5px; color: #a1a1aa; font-size: 12px; line-height: 1.45; }
 .library-list {
   min-height: 200px;
   max-height: 420px;
@@ -1334,7 +1368,6 @@ html.light .action-card-title { color: #4f46e5; }
 html.light .project-title { color: #1e1b4b; }
 html.light .project-desc { color: #4b5563; }
 html.light .project-meta { color: #6b7280; }
-html.light .example-hint-text { color: #6b7280; }
 html.light .library-item {
   background: #faf9ff;
   border-color: #e5e7eb;

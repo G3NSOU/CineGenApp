@@ -21,7 +21,7 @@ Security fixes are only provided for the latest release.
 If you discover a security vulnerability, please contact us privately:
 
 - **GitHub Security Advisory**：点击仓库页面的 [Security](../../security/advisories/new) 标签 → Report a vulnerability
-- **微信 / WeChat**：通过 README 中的二维码添加作者微信私信
+- **GitHub Security Advisory**：优先使用仓库的私密漏洞报告功能
 
 ### 响应流程 / Response Process
 
@@ -32,10 +32,10 @@ If you discover a security vulnerability, please contact us privately:
 
 ### 注意事项 / Notes
 
-本项目是**本地离线桌面应用**，不涉及服务端数据传输。用户的 AI API Key 和项目数据均存储在本地，不经过任何第三方服务器。主要安全风险集中在：
+本项目是**本地优先应用**，项目数据库和凭据存储在本地。用户主动生成内容、测试连接或同步素材时，相关提示词和素材会发送到用户配置的第三方 AI、图床或对象存储服务。主要安全风险集中在：
 
 - 本地文件读写权限
 - 对接第三方 AI API 时的网络请求
 - 依赖包的已知漏洞
 
-This is a **local desktop application**. No user data or API keys are transmitted through any third-party server. Security risks are mainly related to local file access, outbound AI API requests, and known dependency vulnerabilities.
+This is a **local-first application**. Project data and credentials are stored locally, while user-initiated generation, connection tests, and material synchronization may send prompts or assets to configured third-party services. Security risks are mainly related to local file access, outbound API requests, credential handling, and dependency vulnerabilities.

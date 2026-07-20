@@ -51,6 +51,11 @@ function list(db, query) {
 }
 
 function rowToItem(r) {
+  const parseJson = (value, fallback) => {
+    if (!value) return fallback;
+    if (typeof value === 'object') return value;
+    try { return JSON.parse(value); } catch (_) { return fallback; }
+  };
   return {
     id: r.id,
     storyboard_id: r.storyboard_id,
@@ -60,6 +65,19 @@ function rowToItem(r) {
     model: r.model,
     image_gen_id: r.image_gen_id,
     image_url: r.image_url,
+    first_frame_url: r.first_frame_url,
+    last_frame_url: r.last_frame_url,
+    reference_image_urls: parseJson(r.reference_image_urls, []),
+    generation_mode: r.generation_mode || null,
+    reference_assets: parseJson(r.reference_assets, []),
+    generation_config: parseJson(r.generation_config, {}),
+    voice_reference_url: r.voice_reference_url || null,
+    duration: r.duration,
+    aspect_ratio: r.aspect_ratio,
+    resolution: r.resolution,
+    seed: r.seed,
+    camera_fixed: r.camera_fixed,
+    watermark: r.watermark,
     video_url: r.video_url,
     local_path: r.local_path,
     status: r.status,
@@ -213,6 +231,11 @@ function resolveStoragePath(cfg) {
 }
 
 async function finalizeSuccessfulVideo(db, log, videoGenId, row, rowForAspect, videoUrl, logLabel) {
+  const current = db.prepare('SELECT status FROM video_generations WHERE id = ?').get(Number(videoGenId));
+  if (current?.status === 'cancelled') {
+    log.info('Skip finalized video because task was cancelled', { id: videoGenId });
+    return;
+  }
   const now = new Date().toISOString();
   let localPath = null;
   try {
@@ -276,6 +299,8 @@ async function pollProviderTaskAndFinalize(db, log, videoGenId, row, rowForAspec
     pollMaxAttempts,
     POLL_INTERVAL_MS
   );
+  const current = db.prepare('SELECT status FROM video_generations WHERE id = ?').get(Number(videoGenId));
+  if (current?.status === 'cancelled') return;
   const now = new Date().toISOString();
   const polledVideo = resolveRemoteVideoUrl(pollResult.video_url, pollResult.error);
   if (polledVideo.ok) {
@@ -405,8 +430,8 @@ async function processVideoGeneration(db, log, videoGenId) {
     // 优先使用分镜自身的镜头时长（storyboard.duration），其次用 video_generations.duration
     let effectiveDuration = row.duration || null;
     if (row.storyboard_id) {
-      const sb = db.prepare('SELECT duration FROM storyboards WHERE id = ?').get(row.storyboard_id);
-      if (sb && sb.duration > 0) {
+      const sb = db.prepare('SELECT duration, creation_mode FROM storyboards WHERE id = ?').get(row.storyboard_id);
+      if (sb && sb.creation_mode !== 'custom_multi_reference' && sb.duration > 0) {
         effectiveDuration = sb.duration;
         log.info('使用分镜镜头时长', { storyboard_id: row.storyboard_id, duration: effectiveDuration, video_gen_id: videoGenId });
       }
@@ -439,6 +464,24 @@ async function processVideoGeneration(db, log, videoGenId) {
         `正在上传 ${reference_urls.length} 张参考图到图床…`
       );
     }
+    const referenceAssets = (() => {
+      if (Array.isArray(row.reference_assets)) return row.reference_assets;
+      try { return row.reference_assets ? JSON.parse(row.reference_assets) : []; } catch (_) { return []; }
+    })();
+    const explicitAudioReferences = row.generation_mode
+      ? referenceAssets.flatMap((asset) => {
+        if (asset?.type === 'audio' && asset.url) return [{ type: 'audio', url: asset.url, duration: Number(asset.duration) || 0 }];
+        if (asset?.voice && !asset.voice.muted && asset.voice.url) return [{
+          type: 'voice', url: asset.voice.url, duration: Number(asset.voice.duration) || 0,
+          after_image_order: Number(asset.order) || null,
+        }];
+        return [];
+      })
+      : undefined;
+    const generationConfig = (() => {
+      if (row.generation_config && typeof row.generation_config === 'object') return row.generation_config;
+      try { return row.generation_config ? JSON.parse(row.generation_config) : {}; } catch (_) { return {}; }
+    })();
     const result = await videoClient.callVideoApi(db, log, {
       prompt: row.prompt,
       model: row.model,
@@ -455,6 +498,9 @@ async function processVideoGeneration(db, log, videoGenId) {
       first_frame_url: hasOmniRefs ? undefined : row.first_frame_url,
       last_frame_url: hasOmniRefs ? undefined : row.last_frame_url,
       reference_urls,
+      voice_reference_url: row.voice_reference_url || undefined,
+      audio_references: explicitAudioReferences,
+      web_search: generationConfig.web_search === true,
       files_base_url: filesBaseUrl,
       storage_local_path: storageLocalPath,
       video_gen_id: videoGenId,
@@ -478,6 +524,11 @@ async function processVideoGeneration(db, log, videoGenId) {
       return;
     }
     if (result.task_id) {
+      const current = db.prepare('SELECT status FROM video_generations WHERE id = ?').get(Number(videoGenId));
+      if (current?.status === 'cancelled') {
+        await videoClient.cancelVolcengineVideoTask(config, result.task_id).catch(() => null);
+        return;
+      }
       db.prepare(
         'UPDATE video_generations SET status = ?, provider_task_id = ?, updated_at = ? WHERE id = ?'
       ).run('processing', result.task_id, now2, videoGenId);
@@ -496,6 +547,76 @@ async function processVideoGeneration(db, log, videoGenId) {
   }
 }
 
+async function cancelGeneration(db, log, id) {
+  const row = db.prepare('SELECT * FROM video_generations WHERE id = ? AND deleted_at IS NULL').get(Number(id));
+  if (!row) return null;
+  if (row.status === 'completed' || row.status === 'failed' || row.status === 'cancelled') {
+    return { item: rowToItem(row), upstream: null, already_done: true };
+  }
+  let upstream = null;
+  if (row.provider_task_id) {
+    const config = videoClient.getDefaultVideoConfig(db, row.model);
+    if (config) upstream = await videoClient.cancelVolcengineVideoTask(config, row.provider_task_id);
+    if (upstream?.error) throw new Error(upstream.error);
+  }
+  const now = new Date().toISOString();
+  db.prepare('UPDATE video_generations SET status = ?, error_msg = ?, updated_at = ?, completed_at = ? WHERE id = ?')
+    .run('cancelled', '用户已取消', now, now, Number(id));
+  if (row.task_id) taskService.cancelTask(db, log, row.task_id, '用户已取消视频生成');
+  return { item: getById(db, id), upstream };
+}
+
+function duplicateAsStoryboard(db, log, id) {
+  const source = db.prepare(
+    `SELECT vg.*, s.episode_id, s.title AS storyboard_title, s.storyboard_number
+     FROM video_generations vg JOIN storyboards s ON s.id = vg.storyboard_id
+     WHERE vg.id = ? AND vg.deleted_at IS NULL AND s.deleted_at IS NULL`
+  ).get(Number(id));
+  if (!source) return null;
+  if (source.status !== 'completed') throw new Error('仅已完成的视频可以创建副本');
+  const now = new Date().toISOString();
+  const next = db.prepare('SELECT COALESCE(MAX(storyboard_number), 0) + 1 AS n FROM storyboards WHERE episode_id = ? AND deleted_at IS NULL').get(source.episode_id)?.n || 1;
+  const title = `${source.storyboard_title || `视频 ${source.storyboard_number || ''}`} 副本`;
+  const tx = db.transaction(() => {
+    const sbInfo = db.prepare(
+      `INSERT INTO storyboards (episode_id, storyboard_number, title, duration, video_prompt, creation_mode, video_url, local_path, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 'custom_multi_reference', ?, ?, 'completed', ?, ?)`
+    ).run(source.episode_id, next, title, source.duration || 5, source.prompt || '', source.video_url, source.local_path, now, now);
+    const storyboardId = Number(sbInfo.lastInsertRowid);
+    const vgInfo = db.prepare(
+      `INSERT INTO video_generations
+       (drama_id, storyboard_id, provider, prompt, model, image_url, first_frame_url, last_frame_url,
+        reference_image_urls, generation_mode, reference_assets, generation_config, voice_reference_url, duration,
+        aspect_ratio, resolution, seed, camera_fixed, watermark, video_url, local_path, status, created_at, updated_at, completed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?)`
+    ).run(source.drama_id, storyboardId, source.provider, source.prompt, source.model,
+      source.image_url, source.first_frame_url, source.last_frame_url, source.reference_image_urls,
+      source.generation_mode, source.reference_assets, source.generation_config, source.voice_reference_url,
+      source.duration, source.aspect_ratio, source.resolution, source.seed, source.camera_fixed, source.watermark,
+      source.video_url, source.local_path, now, now, now);
+    return { storyboard_id: storyboardId, video_generation_id: Number(vgInfo.lastInsertRowid), title };
+  });
+  const result = tx();
+  log.info('Free studio video duplicated', { source_video_generation_id: Number(id), ...result });
+  return result;
+}
+
+async function listProviderTasks(db, query) {
+  const config = videoClient.getDefaultVideoConfig(db, query.model || null);
+  if (!config) throw new Error('未配置默认视频模型');
+  const result = await videoClient.listVolcengineVideoTasks(config, query);
+  if (result.error) throw new Error(result.error);
+  return result;
+}
+
+async function deleteProviderTask(db, taskId, model) {
+  const config = videoClient.getDefaultVideoConfig(db, model || null);
+  if (!config) throw new Error('未配置默认视频模型');
+  const result = await videoClient.cancelVolcengineVideoTask(config, taskId);
+  if (result.error) throw new Error(result.error);
+  return result;
+}
+
 function deleteById(db, log, id) {
   const now = new Date().toISOString();
   const result = db.prepare('UPDATE video_generations SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL').run(now, Number(id));
@@ -506,6 +627,10 @@ module.exports = {
   list,
   getById,
   deleteById,
+  cancelGeneration,
+  duplicateAsStoryboard,
+  listProviderTasks,
+  deleteProviderTask,
   processVideoGeneration,
   resumeProcessingVideoGenerations,
 };

@@ -1,0 +1,46 @@
+{
+  "appId": "com.cinegen.platform",
+  "productName": "CineGen",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "main.js",
+    "preload.js",
+    "package.json",
+    "backend-app/**/*",
+    "node_modules/**/*"
+  ],
+  "asarUnpack": [
+    "node_modules/better-sqlite3/**",
+    "node_modules/sharp/**",
+    "backend-app/tools/**"
+  ],
+  "extraResources": [
+    {
+      "from": "frontweb-dist",
+      "to": "frontweb/dist",
+      "filter": ["**/*"]
+    },
+    {
+      "from": "vendor/win32-x64",
+      "to": "ffmpeg",
+      "filter": ["ffmpeg.exe", "ffprobe.exe", "LICENSE*"]
+    }
+  ],
+  "win": {
+    "target": [
+      { "target": "nsis", "arch": ["x64"] }
+    ],
+    "icon": "assets/cinegen.ico",
+    "artifactName": "CineGen-${version}-windows-x64-setup.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "CineGen",
+    "uninstallDisplayName": "CineGen"
+  }
+}
