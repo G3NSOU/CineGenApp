@@ -3,43 +3,19 @@
     <Transition name="background-crossfade">
       <div v-if="activeMaterialId === 'simple'" key="simple" class="app-background__layer app-background__simple" />
       <div v-else-if="activeBackgroundId === 'ambient'" key="ambient" class="app-background__layer app-background__ambient" />
-      <SilkBackground
-        v-else-if="activeBackgroundId === 'silk'"
-        key="silk"
-        class="app-background__layer"
-        :speed="silkSettings.speed"
-        :scale="silkSettings.scale"
-        :color="silkSettings.color"
-        :noise-intensity="silkSettings.noiseIntensity"
-        :rotation="silkSettings.rotation"
-      />
-      <SideRaysBackground
-        v-else
-        key="rays"
-        class="app-background__layer"
-        :speed="raysSettings.speed"
-        :ray-color1="raysSettings.rayColor1"
-        :ray-color2="raysSettings.rayColor2"
-        :intensity="raysSettings.intensity"
-        :spread="raysSettings.spread"
-        :origin="raysSettings.origin"
-        :tilt="raysSettings.tilt"
-        :saturation="raysSettings.saturation"
-        :blend="raysSettings.blend"
-        :falloff="raysSettings.falloff"
-        :opacity="raysSettings.opacity"
-      />
+      <RaysBackground v-else-if="activeBackgroundId === 'rays'" key="rays" class="app-background__layer" :colors="raysSettings" />
+      <StardustBackground v-else key="stardust" class="app-background__layer" :reduced-motion="activeReducedMotion" />
     </Transition>
     <div class="app-background__veil" />
   </div>
 </template>
 
 <script setup>
-import SilkBackground from '@/components/SilkBackground.vue'
-import SideRaysBackground from '@/components/SideRaysBackground.vue'
+import RaysBackground from '@/components/RaysBackground.vue'
+import StardustBackground from '@/components/StardustBackground.vue'
 import { useAppBackground } from '@/composables/useAppBackground'
 
-const { activeMaterialId, activeBackgroundId, silkSettings, raysSettings } = useAppBackground()
+const { activeMaterialId, activeBackgroundId, raysSettings, activeReducedMotion } = useAppBackground()
 </script>
 
 <style scoped>

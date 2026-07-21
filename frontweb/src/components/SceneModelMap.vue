@@ -1,12 +1,12 @@
 <template>
   <div class="scene-model-map-page">
-    <div class="page-header">
-      <div class="header-left">
-        <p class="page-desc">
+    <div class="scene-section-header">
+      <div class="scene-header-left">
+        <p class="scene-section-desc">
           配置不同业务场景使用的 AI 模型路由。当调用 generateText 时传入 scene_key，系统会优先使用此处配置的模型。
         </p>
       </div>
-      <div class="header-right">
+      <div class="scene-header-right">
         <el-button type="primary" @click="openAdd">
           <el-icon><Plus /></el-icon>
           添加业务场景配置
@@ -388,16 +388,16 @@ onMounted(() => {
   padding: 0;
 }
 
-.page-header {
+.scene-section-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 20px;
 }
 
-.page-desc {
+.scene-section-desc {
   margin: 0;
-  color: #666;
+  color: var(--cgp-text-muted);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -407,38 +407,38 @@ onMounted(() => {
 }
 
 .scene-key {
-  background: #f5f7fa;
+  background: var(--bg-inner);
   padding: 2px 8px;
   border-radius: 4px;
   font-family: 'Courier New', monospace;
   font-size: 13px;
-  color: #409eff;
+  color: var(--cgp-accent);
   width: fit-content;
 }
 
 .scene-key-label {
   font-size: 12px;
-  color: #666;
+  color: var(--cgp-text-muted);
 }
 
 .model-override {
-  background: #e6f7ff;
+  background: var(--bg-inner);
   padding: 2px 8px;
   border-radius: 4px;
   font-family: 'Courier New', monospace;
   font-size: 13px;
-  color: #096dd9;
+  color: var(--cgp-accent);
 }
 
 .text-muted {
-  color: #999;
+  color: var(--cgp-text-subtle);
   font-size: 13px;
 }
 
 .field-tip {
   margin: 6px 0 0;
   font-size: 12px;
-  color: #999;
+  color: var(--cgp-text-subtle);
   line-height: 1.4;
 }
 </style>

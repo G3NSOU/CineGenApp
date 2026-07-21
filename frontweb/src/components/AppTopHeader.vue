@@ -40,7 +40,7 @@
         <el-popover
           v-if="workspace && active === 'projects'"
           placement="bottom-end"
-          :width="510"
+          width="auto"
           trigger="click"
           popper-class="background-picker-popper"
         >
@@ -56,9 +56,6 @@
                 <strong>外观</strong>
                 <p>当前客户端的所有页面统一使用</p>
               </div>
-              <el-button v-if="activeBackgroundId !== 'ambient'" text size="small" @click="resetActiveBackground">
-                <el-icon><RefreshRight /></el-icon>重置
-              </el-button>
             </header>
 
             <div v-if="supportsMaterialMode" class="material-picker" aria-label="界面材质">
@@ -91,7 +88,7 @@
             <div class="background-picker__section-label">
               <strong>背景</strong>
               <small v-if="activeMaterialId === 'simple'">简约模式下暂停动态背景，切回后自动恢复</small>
-              <small v-else>选择全局背景并调整动态参数</small>
+              <small v-else>选择全局背景效果</small>
             </div>
 
             <div class="background-picker__options" :class="{ 'is-paused': activeMaterialId === 'simple' }">
@@ -115,97 +112,34 @@
               </button>
             </div>
 
-            <div
-              class="background-picker__controls-stage"
-              :class="{ 'is-empty': activeBackgroundId === 'ambient' }"
-            >
-              <div
-                class="background-picker__controls"
-                :class="{ 'is-active': activeMaterialId !== 'simple' && activeBackgroundId === 'silk' }"
-                :aria-hidden="activeMaterialId === 'simple' || activeBackgroundId !== 'silk'"
-                :inert="activeMaterialId === 'simple' || activeBackgroundId !== 'silk'"
-              >
-                <label class="background-control background-control--color">
-                  <span>颜色</span>
-                  <span class="background-color-value">{{ silkSettings.color }}</span>
-                  <input v-model="silkSettings.color" type="color" aria-label="Silk 颜色" />
-                </label>
-                <label class="background-control">
-                  <span>速度</span><output>{{ silkSettings.speed.toFixed(1) }}</output>
-                  <el-slider v-model="silkSettings.speed" :min="0" :max="12" :step="0.5" :show-tooltip="false" />
-                </label>
-                <label class="background-control">
-                  <span>纹理尺度</span><output>{{ silkSettings.scale.toFixed(2) }}</output>
-                  <el-slider v-model="silkSettings.scale" :min="0.35" :max="2" :step="0.05" :show-tooltip="false" />
-                </label>
-                <label class="background-control">
-                  <span>颗粒</span><output>{{ silkSettings.noiseIntensity.toFixed(1) }}</output>
-                  <el-slider v-model="silkSettings.noiseIntensity" :min="0" :max="4" :step="0.1" :show-tooltip="false" />
-                </label>
-                <label class="background-control">
-                  <span>旋转</span><output>{{ silkSettings.rotation.toFixed(2) }}</output>
-                  <el-slider v-model="silkSettings.rotation" :min="0" :max="6.28" :step="0.01" :show-tooltip="false" />
+            <div v-if="activeMaterialId !== 'simple' && activeBackgroundId === 'rays'" class="rays-colors">
+              <div class="rays-colors__label">
+                <strong>光束配色</strong>
+                <el-button text size="small" @click="resetRaysColors"><el-icon><RefreshRight /></el-icon>重置</el-button>
+              </div>
+              <div class="rays-colors__row">
+                <label v-for="i in 6" :key="i" class="rays-color">
+                  <input
+                    :value="raysSettings['c' + i]"
+                    type="color"
+                    :aria-label="'光束 ' + i + ' 颜色'"
+                    @input="raysSettings['c' + i] = $event.target.value"
+                  />
                 </label>
               </div>
+            </div>
 
-              <div
-                class="background-picker__controls background-picker__controls--rays"
-                :class="{ 'is-active': activeMaterialId !== 'simple' && activeBackgroundId === 'rays' }"
-                :aria-hidden="activeMaterialId === 'simple' || activeBackgroundId !== 'rays'"
-                :inert="activeMaterialId === 'simple' || activeBackgroundId !== 'rays'"
-              >
-                <div class="background-control background-control--colors">
-                  <span>光束颜色</span>
-                  <div class="background-color-group">
-                    <label><input v-model="raysSettings.rayColor1" type="color" aria-label="Side Rays 颜色 1" /></label>
-                    <label><input v-model="raysSettings.rayColor2" type="color" aria-label="Side Rays 颜色 2" /></label>
-                  </div>
-                </div>
-                <label class="background-control">
-                  <span>速度</span><output>{{ raysSettings.speed.toFixed(1) }}</output>
-                  <el-slider v-model="raysSettings.speed" :min="0" :max="8" :step="0.1" :show-tooltip="false" />
-                </label>
-                <label class="background-control">
-                  <span>亮度</span><output>{{ raysSettings.intensity.toFixed(1) }}</output>
-                  <el-slider v-model="raysSettings.intensity" :min="0.2" :max="4" :step="0.1" :show-tooltip="false" />
-                </label>
-                <label class="background-control">
-                  <span>展开</span><output>{{ raysSettings.spread.toFixed(1) }}</output>
-                  <el-slider v-model="raysSettings.spread" :min="0.2" :max="4" :step="0.1" :show-tooltip="false" />
-                </label>
-                <label class="background-control background-control--select">
-                  <span>光源位置</span>
-                  <el-select v-model="raysSettings.origin" size="small" aria-label="Side Rays 光源位置">
-                    <el-option label="左上" value="top-left" /><el-option label="右上" value="top-right" />
-                    <el-option label="左下" value="bottom-left" /><el-option label="右下" value="bottom-right" />
-                  </el-select>
-                </label>
-                <label class="background-control">
-                  <span>倾斜</span><output>{{ raysSettings.tilt.toFixed(0) }}°</output>
-                  <el-slider v-model="raysSettings.tilt" :min="-90" :max="90" :step="1" :show-tooltip="false" />
-                </label>
-                <label class="background-control">
-                  <span>饱和度</span><output>{{ raysSettings.saturation.toFixed(1) }}</output>
-                  <el-slider v-model="raysSettings.saturation" :min="0" :max="3" :step="0.1" :show-tooltip="false" />
-                </label>
-                <label class="background-control">
-                  <span>双色混合</span><output>{{ raysSettings.blend.toFixed(2) }}</output>
-                  <el-slider v-model="raysSettings.blend" :min="0" :max="1" :step="0.05" :show-tooltip="false" />
-                </label>
-                <label class="background-control">
-                  <span>衰减</span><output>{{ raysSettings.falloff.toFixed(1) }}</output>
-                  <el-slider v-model="raysSettings.falloff" :min="0.5" :max="4" :step="0.1" :show-tooltip="false" />
-                </label>
-                <label class="background-control">
-                  <span>透明度</span><output>{{ raysSettings.opacity.toFixed(2) }}</output>
-                  <el-slider v-model="raysSettings.opacity" :min="0.1" :max="1" :step="0.05" :show-tooltip="false" />
-                </label>
+            <div class="motion-toggle">
+              <div class="motion-toggle__label">
+                <strong>减弱动效</strong>
+                <small>限 30fps 并略降速，更省资源</small>
               </div>
+              <el-switch :model-value="activeReducedMotion" @update:model-value="setAppReducedMotion" />
             </div>
           </section>
         </el-popover>
         <el-button v-if="workspace && active === 'projects'" class="btn-settings app-top-header__ai" :class="{ 'is-current': aiActive }" :disabled="aiActive" @click="openAiConfig">
-          <el-icon><Setting /></el-icon><span>AI 配置</span>
+          <el-icon><Setting /></el-icon><span>设置</span>
         </el-button>
         <div v-if="isWindowsDesktop" class="app-window-controls" aria-label="窗口控制">
           <button class="app-window-control" type="button" aria-label="最小化" title="最小化" @click="minimizeWindow">
@@ -261,18 +195,13 @@ const {
   supportsMaterialMode,
   activeBackgroundId,
   backgroundOptions,
-  silkSettings,
-  raysSettings,
   setAppBackground,
   setAppMaterial,
-  resetSilkSettings,
-  resetRaysSettings,
+  raysSettings,
+  activeReducedMotion,
+  setAppReducedMotion,
+  resetRaysColors,
 } = useAppBackground()
-
-function resetActiveBackground() {
-  if (activeBackgroundId.value === 'silk') resetSilkSettings()
-  if (activeBackgroundId.value === 'rays') resetRaysSettings()
-}
 
 async function minimizeWindow() {
   await window.cinegenWindow?.minimize()
@@ -505,6 +434,9 @@ onBeforeUnmount(() => stopWindowStateListener?.())
   padding: 0 !important;
   overflow: hidden;
   border-radius: 18px !important;
+  width: auto !important;
+  min-width: 360px !important;
+  max-width: 440px !important;
 }
 .background-picker {
   padding: 16px;
@@ -634,32 +566,18 @@ onBeforeUnmount(() => stopWindowStateListener?.())
     radial-gradient(circle at 90% 88%, rgba(30,68,99,.62), transparent 52%),
     linear-gradient(135deg,#111923,#070a0f);
 }
-.background-option__preview.is-silk {
-  background:
-    repeating-radial-gradient(ellipse at 15% 120%, transparent 0 12%, rgba(102,137,190,.22) 14% 18%, transparent 21% 29%),
-    linear-gradient(140deg,#254878,#0b1b33 52%,#1b3663);
-  background-size: 170% 190%, auto;
-}
-.background-option__preview.is-silk::after {
-  content: "";
-  position: absolute;
-  inset: -40%;
-  background: repeating-linear-gradient(128deg, transparent 0 13px, rgba(195,211,232,.09) 17px, transparent 24px);
-  transform: rotate(-8deg);
-}
 .background-option__preview.is-rays {
   background:
-    linear-gradient(136deg, rgba(234,179,8,.05) 12%, rgba(234,179,8,.58) 30%, transparent 47%),
-    linear-gradient(150deg, rgba(150,200,255,.72) 18%, rgba(150,200,255,.12) 45%, transparent 61%),
+    linear-gradient(136deg, rgba(59,130,246,.05) 12%, rgba(59,130,246,.55) 30%, transparent 47%),
+    linear-gradient(150deg, rgba(147,197,253,.55) 18%, rgba(147,197,253,.1) 45%, transparent 61%),
     #070a0f;
 }
-.background-option__preview.is-rays::after {
-  content: "";
-  position: absolute;
-  inset: -20%;
-  background: repeating-linear-gradient(138deg, transparent 0 14px, rgba(228,235,238,.13) 18px, transparent 28px);
-  filter: blur(5px);
-  transform: rotate(4deg);
+.background-option__preview.is-stardust {
+  background:
+    radial-gradient(circle at 28% 32%, rgba(96,165,250,.55), transparent 38%),
+    radial-gradient(circle at 72% 68%, rgba(34,211,238,.38), transparent 42%),
+    radial-gradient(circle at 50% 80%, rgba(147,197,253,.3), transparent 40%),
+    #05070b;
 }
 .background-option__check {
   position: absolute;
@@ -682,97 +600,51 @@ onBeforeUnmount(() => stopWindowStateListener?.())
 .background-option__copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .background-option__copy strong { font-size: 12px; font-weight: 620; }
 .background-option__copy small { margin-top: 2px; color: #7f7f7f; font-size: 10px; }
-.background-picker__controls {
-  position: absolute;
-  top: 14px;
-  left: 0;
-  width: 100%;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 14px;
-  margin-top: 0;
-  padding: 13px;
+.rays-colors {
+  margin-top: 12px;
+  padding: 11px 12px;
   border: 1px solid rgba(235,235,235,.075);
   border-radius: 12px;
   background: rgba(5,5,5,.19);
-  opacity: 0;
-  transform: translateY(-7px) scale(.992);
-  transform-origin: 50% 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition:
-    opacity 180ms var(--motion-ease-out),
-    transform var(--motion-standard) var(--motion-ease-out),
-    visibility 0s linear var(--motion-standard);
 }
-.background-picker__controls-stage {
-  position: relative;
-  height: 276px;
-  overflow: hidden;
-}
-.background-picker__controls.is-active {
-  z-index: 1;
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  visibility: visible;
-  pointer-events: auto;
-  transition-delay: 0s, 0s, 0s;
-}
-.background-picker__controls--rays { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.background-control {
-  display: grid;
-  grid-template-columns: 1fr auto;
+.rays-colors__label {
+  display: flex;
   align-items: center;
-  min-width: 0;
-  color: #a8a8a8;
-  font-size: 11px;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 9px;
 }
-.background-control output { color: #727272; font-variant-numeric: tabular-nums; }
-.background-control .el-slider { grid-column: 1 / -1; height: 22px; }
-.background-control .el-slider__runway { height: 3px; background: rgba(235,235,235,.09); }
-.background-control .el-slider__bar { height: 3px; background: #bdbdbd; }
-.background-control .el-slider__button {
-  width: 12px;
-  height: 12px;
-  border: 2px solid #d2d2d2;
-  background: #777;
-}
-.background-control--color {
-  grid-column: 1 / -1;
-  grid-template-columns: 1fr auto 28px;
-  min-height: 30px;
-}
-.background-control--colors {
-  grid-column: 1 / -1;
-  grid-template-columns: 1fr auto;
-  min-height: 32px;
-}
-.background-control--select { grid-template-columns: 1fr 88px; }
-.background-control--select .el-select { width: 88px; }
-.background-color-group { display: flex; gap: 7px; }
-.background-color-group label { display: block; width: 30px; height: 28px; }
-.background-color-group input[type="color"] {
-  width: 30px;
-  height: 28px;
-  padding: 2px;
-  border: 1px solid rgba(235,235,235,.16);
-  border-radius: 8px;
-  background: rgba(235,235,235,.04);
-  cursor: pointer;
-}
-.background-color-value { margin-right: 8px; color: #818181; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.background-control input[type="color"] {
-  width: 28px;
-  height: 28px;
-  padding: 2px;
+.rays-colors__label strong { color: #d7d7d7; font-size: 12px; font-weight: 620; }
+.rays-colors__label .el-button { margin-top: 0; }
+.rays-colors__row { display: flex; gap: 7px; }
+.rays-color {
+  display: block;
+  width: 34px;
+  height: 30px;
   overflow: hidden;
   border: 1px solid rgba(235,235,235,.16);
   border-radius: 8px;
-  background: rgba(235,235,235,.04);
+}
+.rays-color input[type="color"] {
+  width: 34px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: none;
   cursor: pointer;
 }
+.motion-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 13px;
+  border-top: 1px solid rgba(235,235,235,.075);
+}
+.motion-toggle__label strong { display: block; color: #d7d7d7; font-size: 12px; font-weight: 620; }
+.motion-toggle__label small { display: block; margin-top: 2px; color: #777; font-size: 10px; }
 @media (prefers-reduced-motion: reduce) {
   .background-option { transition: color var(--motion-fast) var(--motion-ease-out), border-color var(--motion-fast) var(--motion-ease-out); }
-  .background-picker__controls { transform: none; transition: opacity var(--motion-fast) var(--motion-ease-out), visibility 0s linear var(--motion-fast); }
 }
 </style>

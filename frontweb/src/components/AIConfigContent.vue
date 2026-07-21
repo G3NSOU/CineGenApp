@@ -123,11 +123,12 @@
       </el-tab-pane>
       <el-tab-pane label="高级设置（业务场景）" name="sceneModelMap" lazy>
         <div v-if="activeTab === 'sceneModelMap'" class="tab-content">
-          <SceneModelMap />
+          <div class="cgp-card section-card"><SceneModelMap /></div>
         </div>
       </el-tab-pane>
       <el-tab-pane label="生成设置" name="generation" lazy>
-        <div v-if="activeTab === 'generation'" class="tab-content generation-settings">
+        <div v-if="activeTab === 'generation'" class="tab-content">
+          <div class="cgp-card section-card generation-settings">
           <div class="gs-section-title icon-label"><el-icon><Lightning /></el-icon>一键生成并发设置</div>
           <p class="gs-desc">控制「一键生成视频」和「补全并生成」流水线中，各类任务同时并行生成的数量。并发数越高速度越快，但过高可能触发 API 限流（429 错误）。建议根据你的 API 额度选择。</p>
 
@@ -196,16 +197,22 @@
               <li>视频并发：步骤 7 分镜视频</li>
             </ul>
           </div>
+          </div>
         </div>
       </el-tab-pane>
       <el-tab-pane label="SD2 资产管理" name="sd2_assets" lazy>
         <div v-if="activeTab === 'sd2_assets'" class="tab-content">
-          <Sd2AssetManagement :configs="list" @saved="loadList" />
+          <div class="cgp-card section-card sd2-card"><Sd2AssetManagement :configs="list" @saved="loadList" /></div>
         </div>
       </el-tab-pane>
       <el-tab-pane label="存储设置" name="storage" lazy>
         <div v-if="activeTab === 'storage'" class="tab-content">
-          <TosStorageSettings />
+          <div class="cgp-card section-card"><TosStorageSettings /></div>
+        </div>
+      </el-tab-pane>
+      <el-tab-pane label="版本" name="version" lazy>
+        <div v-if="activeTab === 'version'" class="tab-content">
+          <div class="cgp-card section-card"><VersionInfo /></div>
         </div>
       </el-tab-pane>
     </el-tabs>
@@ -372,6 +379,7 @@
             <el-option label="OpenAI 兼容（大多数中转站默认）" value="openai" />
             <el-option label="火山引擎（豆包 Seedream / Seedance）" value="volcengine" />
             <el-option label="火山即梦 Seedance 全能（方舟多图参考，Seedance 2.0 等）" value="volcengine_omni" />
+            <el-option label="APIMart 中转（Seedance 2.0，prompt + size + image_urls）" value="apimart" />
             <el-option label="通义万象 DashScope" value="dashscope" />
             <el-option label="Google Gemini（图片 / Veo 视频）" value="gemini" />
             <el-option label="Sora 中转站（multipart/form-data，seconds+size）" value="sora" />
@@ -1202,6 +1210,7 @@ import { generationSettingsAPI } from '@/api/prompts'
 import PromptEditor from '@/components/PromptEditor.vue'
 import SceneModelMap from '@/components/SceneModelMap.vue'
 import Sd2AssetManagement from '@/components/Sd2AssetManagement.vue'
+import VersionInfo from '@/components/VersionInfo.vue'
 import TosStorageSettings from '@/components/TosStorageSettings.vue'
 
 const props = defineProps({
@@ -1483,6 +1492,7 @@ const providerConfigs = {
     { id: 'kling', name: '可灵 Kling', models: ['kling-omni-video', 'kling-video', 'kling-motion-control'] },
     { id: 'vidu', name: 'Vidu', models: ['viduq2', 'viduq2-pro', 'viduq2-turbo', 'viduq3-pro'] },
     { id: 'volces', name: '火山引擎', models: ['doubao-seedance-2-0-260128', 'doubao-seedance-2-0-fast-260128', 'doubao-seedance-2-0-mini-260615', 'doubao-seedance-1-5-pro-251215', 'doubao-seedance-1-0-lite-i2v-250428', 'doubao-seedance-1-0-lite-t2v-250428', 'doubao-seedance-1-0-pro-250528', 'doubao-seedance-1-0-pro-fast-251015'] },
+    { id: 'apimart', name: 'APIMart 中转（Seedance 2.0 系列）', models: ['doubao-seedance-2.0', 'doubao-seedance-2.0-fast', 'doubao-seedance-2.0-mini'] },
     // { id: 'chatfire', name: 'Chatfire', models: ['doubao-seedance-1-5-pro-251215', 'doubao-seedance-1-0-lite-i2v-250428', 'doubao-seedance-1-0-lite-t2v-250428', 'doubao-seedance-1-0-pro-250528', 'doubao-seedance-1-0-pro-fast-251015', 'sora-2', 'sora-2-pro'] },
     { id: 'minimax', name: 'MiniMax 海螺', models: ['MiniMax-Hailuo-2.3', 'MiniMax-Hailuo-2.3-Fast', 'MiniMax-Hailuo-02'] },
     { id: 'gemini', name: 'Google Gemini (Veo)', models: ['veo-3.1-generate-preview', 'veo-3.0-generate-preview', 'veo-3.0-fast-generate-preview'] },
@@ -1517,6 +1527,7 @@ const providerProtocolMap = {
   volcengine: 'volcengine',
   volces: 'volcengine',
   volc: 'volcengine',
+  apimart: 'apimart',
   nano_banana: 'nano_banana',
   dashscope: 'dashscope',
   qwen_image: 'dashscope',
@@ -1546,6 +1557,7 @@ function getBaseUrlForProvider(provider) {
   if (p === 'gemini' || p === 'google') return 'https://generativelanguage.googleapis.com'
   if (p === 'minimax') return 'https://api.minimaxi.com/v1'
   if (p === 'volces' || p === 'volcengine') return 'https://ark.cn-beijing.volces.com/api/v3'
+  if (p === 'apimart') return 'https://api.apimart.ai/v1'
   if (p === 'openai') return 'https://api.openai.com/v1'
   if (p === 'deepseek') return 'https://api.deepseek.com'
   if (p === 'dashscope') return 'https://dashscope.aliyuncs.com'
@@ -1676,6 +1688,8 @@ const endpointPreviewInfo = computed(() => {
       submitPath = endpoint
     } else if (proto === 'volcengine_omni') {
       submitPath = '/contents/generations/tasks'
+    } else if (proto === 'apimart' || p === 'apimart') {
+      submitPath = '/videos/generations'
     } else if (proto === 'volcengine' || p === 'volces' || p === 'volcengine') {
       submitPath = '/contents/generations/tasks'
     } else if (proto === 'dashscope' || p === 'dashscope') {
@@ -1721,6 +1735,8 @@ const endpointPreviewInfo = computed(() => {
       queryPath = query_endpoint
     } else if (proto === 'volcengine_omni') {
       queryPath = '/contents/generations/tasks/{id}'
+    } else if (proto === 'apimart' || p === 'apimart') {
+      queryPath = '/tasks/{taskId}'
     } else if (proto === 'volcengine' || p === 'volces' || p === 'volcengine') {
       queryPath = '/contents/generations/tasks/{id}'
     } else if (proto === 'dashscope' || p === 'dashscope') {
@@ -1821,6 +1837,10 @@ function onProviderChange(providerId) {
     form.value.api_protocol = 'agnes'
     form.value.endpoint = '/videos'
     form.value.query_endpoint = '/videos/{taskId}'
+  }
+  if (st === 'video' && providerId === 'apimart') {
+    form.value.endpoint = '/videos/generations'
+    form.value.query_endpoint = '/tasks/{id}'
   }
   if (!editingId.value) {
     form.value.name = (p.name || providerId) + ' ' + serviceTypeLabel(st)
@@ -2393,7 +2413,7 @@ onMounted(() => {
   border-top: 1px solid var(--el-border-color-light, #e4e7ed);
   margin-top: 4px;
   padding-top: 4px;
-  color: var(--el-color-primary, #409eff) !important;
+  color: var(--el-color-primary) !important;
   font-style: italic;
 }
 </style>
@@ -2514,7 +2534,7 @@ onMounted(() => {
 }
 .one-key-tip {
   margin: 0 0 12px;
-  color: #606266;
+  color: var(--cgp-text-muted);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -2535,28 +2555,28 @@ onMounted(() => {
   gap: 12px;
 }
 .one-key-section {
-  background: var(--el-fill-color-light, #f5f7fa);
+  background: var(--el-fill-color-light, var(--bg-inner));
   border-radius: 8px;
   padding: 12px 14px;
 }
 .one-key-section-title {
   font-size: 13px;
   font-weight: 600;
-  color: var(--el-text-color-primary, #303133);
+  color: var(--el-text-color-primary, var(--cgp-text));
   margin-bottom: 8px;
 }
 .one-key-list {
   margin: 0;
   padding-left: 20px;
   font-size: 13px;
-  color: var(--el-text-color-regular, #606266);
+  color: var(--el-text-color-regular, var(--cgp-text-muted));
   line-height: 1.8;
 }
 .one-key-list li {
   margin-bottom: 2px;
 }
 .one-key-link {
-  color: var(--el-color-primary, #409eff);
+  color: var(--el-color-primary);
   text-decoration: none;
 }
 .one-key-link:hover {
@@ -2565,7 +2585,7 @@ onMounted(() => {
 .one-key-note {
   margin: 6px 0 0;
   font-size: 12px;
-  color: var(--el-text-color-secondary, #909399);
+  color: var(--el-text-color-secondary, var(--cgp-text-subtle));
   line-height: 1.5;
 }
 .one-key-note + .one-key-note {
@@ -2622,7 +2642,7 @@ code {
 .field-tip {
   margin: 6px 0 0;
   font-size: 12px;
-  color: #909399;
+  color: var(--cgp-text-subtle);
   line-height: 1.4;
 }
 .form-label-tip {
@@ -2634,7 +2654,7 @@ code {
 .ph-section-title {
   font-size: 13px;
   font-weight: 600;
-  color: #606266;
+  color: var(--cgp-text-muted);
   padding: 4px 0 6px;
   border-bottom: 1px solid #ebeef5;
   margin-bottom: 4px;
@@ -2650,7 +2670,7 @@ code {
 }
 .ph-tag-img {
   background: #ecf5ff;
-  color: #409eff;
+  color: var(--cgp-accent);
   border: 1px solid #b3d8ff;
 }
 .ph-tag-vid {
@@ -2661,10 +2681,10 @@ code {
 .protocol-help .ph-body {
   font-size: 13px;
   line-height: 1.7;
-  color: #303133;
+  color: var(--cgp-text);
 }
 .protocol-help .ph-body pre {
-  background: #f5f7fa;
+  background: var(--bg-inner);
   border-radius: 4px;
   padding: 8px 12px;
   font-size: 12px;
@@ -2682,13 +2702,13 @@ code {
 }
 .tip-icon {
   font-size: 13px;
-  color: #909399;
+  color: var(--cgp-text-subtle);
   cursor: pointer;
   flex-shrink: 0;
   transition: color 0.15s;
 }
 .tip-icon:hover {
-  color: #409eff;
+  color: var(--cgp-accent);
 }
 .endpoint-preview-box {
   background: #f0f7ff;
@@ -2703,13 +2723,13 @@ code {
   align-items: center;
   gap: 8px;
   font-weight: 600;
-  color: #409eff;
+  color: var(--cgp-accent);
   margin-bottom: 8px;
   font-size: 12px;
 }
 .ep-auto-badge {
   background: #e6f1ff;
-  color: #409eff;
+  color: var(--cgp-accent);
   border: 1px solid #b3d8ff;
   border-radius: 3px;
   padding: 0 5px;
@@ -2728,12 +2748,12 @@ code {
 }
 .ep-label {
   flex-shrink: 0;
-  color: #606266;
+  color: var(--cgp-text-muted);
   min-width: 68px;
 }
 .ep-url {
   word-break: break-all;
-  color: #303133;
+  color: var(--cgp-text);
   background: rgba(255,255,255,0.7);
   border: 1px solid #dce8fa;
   border-radius: 3px;
@@ -2745,7 +2765,7 @@ code {
 .ep-tip {
   margin: 8px 0 0;
   font-size: 11px;
-  color: #909399;
+  color: var(--cgp-text-subtle);
   line-height: 1.4;
 }
 .ep-tip-warn {
@@ -2765,16 +2785,21 @@ code {
 }
 .generation-settings {
   max-width: 600px;
+  margin: 0 auto;
+}
+.sd2-card {
+  max-width: 1080px;
+  margin: 0 auto;
 }
 .gs-section-title {
   font-size: 14px;
   font-weight: 600;
-  color: #303133;
+  color: var(--cgp-text);
   margin-bottom: 8px;
 }
 .gs-desc {
   font-size: 13px;
-  color: #606266;
+  color: var(--cgp-text-muted);
   line-height: 1.6;
   margin-bottom: 20px;
 }
@@ -2786,35 +2811,35 @@ code {
 }
 .gs-label {
   font-size: 13px;
-  color: #303133;
+  color: var(--cgp-text);
   font-weight: 500;
   white-space: nowrap;
 }
 .gs-unit {
   font-size: 13px;
-  color: #606266;
+  color: var(--cgp-text-muted);
   white-space: nowrap;
 }
 .gs-tip-box {
   margin-top: 20px;
-  background: #f5f7fa;
+  background: var(--bg-inner);
   border-radius: 8px;
   padding: 14px 16px;
   font-size: 13px;
 }
 .gs-tip-title {
   font-weight: 600;
-  color: #303133;
+  color: var(--cgp-text);
   margin-bottom: 8px;
 }
 .gs-tip-list {
   margin: 0 0 8px 16px;
   padding: 0;
-  color: #606266;
+  color: var(--cgp-text-muted);
   line-height: 1.8;
 }
 .gs-tip-note {
-  color: #909399;
+  color: var(--cgp-text-subtle);
   font-size: 12px;
 }
 .provider-task-toolbar {
@@ -2825,7 +2850,7 @@ code {
 }
 .provider-task-toolbar > span {
   margin-left: auto;
-  color: #909399;
+  color: var(--cgp-text-subtle);
   font-size: 12px;
 }
 </style>

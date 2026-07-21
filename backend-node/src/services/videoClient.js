@@ -33,6 +33,7 @@ function inferVideoProtocol(provider) {
   if (p === 'jimeng_ai_api') return 'jimeng_ai_api';
   if (p === 'xai' || p === 'grok') return 'xai';
   if (p === 'agnes') return 'agnes';
+  if (p === 'apimart') return 'apimart';
   return 'openai';
 }
 
@@ -770,6 +771,165 @@ async function callVolcengineOmniVideoApi(config, log, opts) {
 }
 
 /**
+ * APIMart 中转 - Seedance 2.0 系列（doubao-seedance-2.0 / -fast / -mini）
+ * 独立协议，与火山原生 volcengine / volcengine_omni 完全隔离，互不影响。
+ * - 创建：POST {base}/videos/generations  body: { model, prompt, size, duration, generate_audio, resolution, seed?, image_urls?, audio_urls? }
+ * - 查询：GET  {base}/tasks/{task_id}    响应: { code, data: { status, progress, result: { videos:[{url:[...]}] } } }
+ * - 认证：Authorization: Bearer <api_key>
+ * - 创建响应: { code:200, data:[{ status:'submitted', task_id:'...' }] }
+ */
+async function callApimartVideoApi(config, log, opts) {
+  const {
+    prompt,
+    model: preferredModel,
+    duration,
+    aspect_ratio,
+    resolution,
+    seed,
+    image_url,
+    reference_urls,
+    files_base_url,
+    storage_local_path,
+    video_gen_id,
+    voice_reference_url,
+    audio_references,
+  } = opts;
+
+  const base = String(config.base_url || 'https://api.apimart.ai/v1').replace(/\/$/, '');
+  let createPath = String(config.endpoint || '').trim();
+  if (!createPath) {
+    createPath = '/videos/generations';
+  }
+  if (!/^https?:\/\//i.test(createPath)) {
+    if (!createPath.startsWith('/')) createPath = '/' + createPath;
+  }
+  const url = /^https?:\/\//i.test(createPath) ? createPath : base + createPath;
+
+  // APIMart 模型名（doubao-seedance-2.0 等）保持原样，不做火山官方名归一化
+  const model = getModelFromConfig(config, preferredModel);
+  const ratio = aspect_ratio || '16:9';
+  const dur = Number(duration);
+  const effectiveDuration = Number.isFinite(dur) && dur > 0 ? Math.min(15, Math.max(5, Math.round(dur))) : 5;
+
+  // 解析图片 URL（复用 omni 的图片解析：本地转 base64 或经图片代理获取公开 URL）
+  const refList = Array.isArray(reference_urls) ? reference_urls.slice() : [];
+  const primary = (image_url || '').trim();
+  const orderedUrls = [...(primary ? [primary] : []), ...refList.filter((u) => u !== primary)];
+  const urls = orderedUrls.slice(0, 9);
+  const resolvedImageUrls = [];
+  for (let i = 0; i < urls.length; i++) {
+    const u = await resolveVolcOmniImageAsync(urls[i], files_base_url, storage_local_path, log, video_gen_id, i);
+    if (!u) {
+      return { error: `参考图片${i + 1}无法解析或上传，已中止任务` };
+    }
+    resolvedImageUrls.push(u);
+  }
+
+  // 音频参考：APIMart 用 audio_urls 字符串数组
+  const resolvedAudioUrls = [];
+  const explicitAudio = Array.isArray(audio_references) ? audio_references.slice(0, 3) : null;
+  if (explicitAudio) {
+    for (const audio of explicitAudio) {
+      let audioUrl = String(audio?.url || '').trim();
+      if (!audioUrl) continue;
+      if (storage_local_path) {
+        const resolved = resolveStorageFilePath(storage_local_path, audioUrl);
+        try {
+          if (resolved && fs.existsSync(resolved.filePath)) {
+            const buf = fs.readFileSync(resolved.filePath);
+            const ext = path.extname(resolved.filePath).toLowerCase();
+            const mime = { '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg' }[ext] || 'audio/mpeg';
+            audioUrl = `data:${mime};base64,${buf.toString('base64')}`;
+          }
+        } catch (_) {}
+      }
+      if (audioUrl) resolvedAudioUrls.push(audioUrl);
+    }
+  } else if (voice_reference_url) {
+    let voiceUrl = String(voice_reference_url).trim();
+    if (voiceUrl && storage_local_path) {
+      const resolved = resolveStorageFilePath(storage_local_path, voiceUrl);
+      try {
+        if (resolved && fs.existsSync(resolved.filePath)) {
+          const buf = fs.readFileSync(resolved.filePath);
+          const ext = path.extname(resolved.filePath).toLowerCase();
+          const mime = { '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg' }[ext] || 'audio/mpeg';
+          voiceUrl = 'data:' + mime + ';base64,' + buf.toString('base64');
+        }
+      } catch (_) {}
+    }
+    if (voiceUrl) {
+      resolvedAudioUrls.push(voiceUrl);
+      log.info('[APIMart] 已注入音色参考音频', { video_gen_id, voice_ref: String(voice_reference_url).slice(0, 80) });
+    }
+  }
+
+  // 构造 APIMart 请求体（扁平 prompt + size + image_urls/audio_urls，非 content 数组）
+  const body = {
+    model,
+    prompt: normalizeOfficialMediaPrompt(prompt, explicitAudio || []),
+    size: ratio,
+    duration: effectiveDuration,
+    generate_audio: true, // CineGen 产品规则：Seedance 2.0 始终生成声音
+    resolution: resolution || '720p',
+  };
+  if (seed != null) body.seed = Number(seed);
+  if (resolvedImageUrls.length) body.image_urls = resolvedImageUrls;
+  if (resolvedAudioUrls.length) body.audio_urls = resolvedAudioUrls;
+
+  log.info('[APIMart] 创建任务', {
+    url, model, size: ratio, duration: effectiveDuration,
+    image_count: resolvedImageUrls.length, audio_count: resolvedAudioUrls.length, video_gen_id,
+    prompt_head: String(body.prompt || '').slice(0, 240),
+    has_voice_relation: body.prompt.includes('声音参考关系'),
+  });
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + (config.api_key || ''),
+    },
+    body: JSON.stringify(body),
+  });
+  const raw = await res.text();
+  log.info('[APIMart] 创建响应', { video_gen_id, status: res.status, raw: raw.slice(0, 1000) });
+
+  if (!res.ok) {
+    let errMsg = 'APIMart 创建失败: ' + res.status;
+    try {
+      const errJson = JSON.parse(raw);
+      const msg = errJson.error?.message || errJson.message || errJson.error;
+      if (msg) errMsg += ' - ' + String(msg).slice(0, 300);
+    } catch (_) {
+      if (raw) errMsg += ' - ' + raw.slice(0, 200);
+    }
+    return { error: errMsg };
+  }
+
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch (e) {
+    return { error: 'APIMart 响应非 JSON: ' + raw.slice(0, 200) };
+  }
+
+  // 创建响应: { code:200, data:[{ status:'submitted', task_id:'...' }] }
+  const dataArr = Array.isArray(data.data) ? data.data : (data.data ? [data.data] : []);
+  const taskObj = dataArr[0] || data;
+  const taskId = taskObj.task_id || taskObj.id || data.task_id || data.id;
+  if (taskId) {
+    log.info('[APIMart] 返回 task_id', { video_gen_id, task_id: taskId, status: taskObj.status });
+    return { task_id: taskId, status: taskObj.status || 'submitted' };
+  }
+  const directVideo = pickProxyVideoUrl(data);
+  if (directVideo) {
+    return { video_url: directVideo };
+  }
+  return { error: 'APIMart 未返回 task_id: ' + JSON.stringify(data).slice(0, 300) };
+}
+
+/**
  * 可灵 Omni-Video
  * - 官方（api.klingai.com / api-beijing.klingai.com）：POST {base}/v1/videos/omni-video，轮询 GET {base}/v1/videos/omni-video/{taskId}
  * - ffir 等中转：POST {base}/kling/v1/videos/omni-video，查询 GET {base}/kling/v1/images/omni-image/{taskId}
@@ -988,6 +1148,7 @@ function buildQueryUrl(config, taskId) {
   else if (proto === 'veo3') defaultEp = '/v1/video/query?id={taskId}';
   else if (isDashScope) defaultEp = '/api/v1/tasks/{taskId}';
   else if (proto === 'volcengine_omni') defaultEp = '/v1/videos/generations/async/{taskId}';
+  else if (proto === 'apimart') defaultEp = '/tasks/{taskId}';
   else if (proto === 'agnes') defaultEp = '/videos/{taskId}';
   else defaultEp = '/video/task/{taskId}';
   const ep = replaceTaskId(config.query_endpoint || defaultEp, taskId);
@@ -3594,6 +3755,24 @@ async function callVideoApi(db, log, opts) {
     });
   }
 
+  if (protocol === 'apimart') {
+    return callApimartVideoApi(config, log, {
+      prompt,
+      model,
+      duration: opts.duration,
+      aspect_ratio,
+      resolution: opts.resolution,
+      seed: opts.seed,
+      image_url: opts.image_url,
+      reference_urls: opts.reference_urls,
+      files_base_url: opts.files_base_url,
+      storage_local_path: opts.storage_local_path,
+      video_gen_id: opts.video_gen_id,
+      voice_reference_url: opts.voice_reference_url,
+      audio_references: opts.audio_references,
+    });
+  }
+
   if (protocol === 'volcengine_omni') {
     return callVolcengineOmniVideoApi(config, log, {
       prompt,
@@ -3819,6 +3998,7 @@ async function pollVideoTask(db, log, videoGenId, taskId, config, maxAttempts = 
   const isKling = protocol === 'kling';
   const isKlingOmni = protocol === 'kling_omni' || (typeof taskId === 'string' && taskId.startsWith('omni:'));
   const isVeo3 = protocol === 'veo3';
+  const isApimart = protocol === 'apimart';
   /** 轮询日志里响应体最大字符数（即梦/方舟等 JSON 可能较长）；0 表示不截断（慎用） */
   const pollLogBodyMax = (() => {
     const v = String(process.env.VIDEO_POLL_LOG_MAX || '16384').trim();
@@ -4035,6 +4215,30 @@ async function pollVideoTask(db, log, videoGenId, taskId, config, maxAttempts = 
           log.warn('[Agnes poll] 标记完成但未返回 video_url', { video_gen_id: videoGenId, data: JSON.stringify(data).slice(0, 500) });
           return { error: 'Agnes 任务完成但未返回视频地址: ' + JSON.stringify(data).slice(0, 300) };
         }
+        continue;
+      }
+
+      if (isApimart) {
+        const taskData = (data && data.data) || {};
+        const status = String(taskData.status || '').toLowerCase();
+        log.info('[APIMart poll] 状态', { video_gen_id: videoGenId, attempt, status, progress: taskData.progress, id: taskId });
+        if (status === 'failed' || status === 'cancelled') {
+          const errMsg = (taskData.error && (taskData.error.message || taskData.error.code)) || 'APIMart 任务失败';
+          log.warn('[APIMart poll] 任务失败', { video_gen_id: videoGenId, error: errMsg });
+          return { error: 'APIMart 视频生成失败: ' + String(errMsg).slice(0, 400) };
+        }
+        if (status === 'completed' || status === 'succeeded' || status === 'success') {
+          const videos = (taskData.result && taskData.result.videos) || [];
+          const rawUrl = videos[0] && videos[0].url;
+          const videoUrl = Array.isArray(rawUrl) ? rawUrl[0] : rawUrl;
+          if (videoUrl && typeof videoUrl === 'string') {
+            log.info('[APIMart poll] 视频生成完成', { video_gen_id: videoGenId, video_url: videoUrl });
+            return { video_url: videoUrl };
+          }
+          log.warn('[APIMart poll] 完成但未解析到视频地址', { video_gen_id: videoGenId, data: JSON.stringify(data).slice(0, 500) });
+          return { error: 'APIMart 任务完成但未返回视频地址: ' + JSON.stringify(data).slice(0, 300) };
+        }
+        // pending / processing / submitted -> 继续轮询
         continue;
       }
 

@@ -447,3 +447,14 @@ button, [role="button"], a, .el-button, .el-tabs__item, .el-select, .el-switch {
     transition: opacity var(--motion-fast) var(--motion-ease-out) !important;
   }
 }
+
+/* === unified section cards (Stage 1) === */
+.cgp-card {
+  background: var(--cgp-glass);
+  backdrop-filter: blur(var(--cgp-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--cgp-blur)) saturate(140%);
+  border: 1px solid var(--cgp-border);
+  border-radius: var(--cgp-radius);
+  box-shadow: var(--cgp-shadow);
+}
+.section-card { padding: 22px 24px; }

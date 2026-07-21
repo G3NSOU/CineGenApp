@@ -108,56 +108,63 @@
       </el-form-item>
     </el-form>
 
-    <el-row :gutter="16">
-      <el-col :span="11">
-        <div class="panel-title">资产组</div>
-        <div class="panel-actions">
+    <div class="sd2-section">
+      <div class="sd2-section-head">
+        <span class="sd2-section-title">资产组</span>
+        <div class="sd2-section-actions">
           <el-button type="primary" size="small" :loading="loadingGroups" @click="refreshGroups">刷新列表</el-button>
           <el-button type="success" size="small" @click="openCreateGroup">新建组</el-button>
         </div>
-        <el-table
-          :data="groupRows"
-          size="small"
-          stripe
-          highlight-current-row
-          max-height="320"
-          @current-change="onGroupRowChange"
-        >
-          <el-table-column prop="Id" label="Id" min-width="120" show-overflow-tooltip />
-          <el-table-column prop="Name" label="名称" min-width="100" show-overflow-tooltip />
-          <el-table-column label="操作" width="168" fixed="right">
-            <template #default="{ row }">
-              <el-button link type="primary" size="small" @click="getGroupDetail(row)">详情</el-button>
-              <el-button link type="primary" size="small" @click="openEditGroup(row)">编辑</el-button>
-              <el-button link type="danger" size="small" @click="deleteGroup(row)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-col>
-      <el-col :span="13">
-        <div class="panel-title">资产（需组 Id）</div>
-        <div class="panel-actions row-gap">
-          <el-input v-model="assetGroupIdInput" placeholder="组 Id，或左侧点选一行" clearable style="flex: 1; min-width: 140px" />
+      </div>
+      <el-table
+        :data="groupRows"
+        size="small"
+        stripe
+        highlight-current-row
+        max-height="320"
+        @current-change="onGroupRowChange"
+      >
+        <el-table-column prop="Id" label="Id" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="Name" label="名称" min-width="100" show-overflow-tooltip />
+        <el-table-column label="操作" width="168" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="getGroupDetail(row)">详情</el-button>
+            <el-button link type="primary" size="small" @click="openEditGroup(row)">编辑</el-button>
+            <el-button link type="danger" size="small" @click="deleteGroup(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+
+    <div class="sd2-section">
+      <div class="sd2-section-head">
+        <span class="sd2-section-title">资产（需组 Id）</span>
+        <div class="sd2-section-actions">
+          <el-input v-model="assetGroupIdInput" placeholder="组 Id，或点选上方资产组行自动填入" clearable style="flex: 1; min-width: 200px" />
           <el-button type="primary" size="small" :loading="loadingAssets" @click="refreshAssets">刷新</el-button>
           <el-button type="success" size="small" @click="openCreateAsset">新建资产</el-button>
         </div>
-        <el-table :data="assetRows" size="small" stripe max-height="320">
-          <el-table-column prop="Id" label="Id" min-width="120" show-overflow-tooltip />
-          <el-table-column prop="Name" label="名称" min-width="90" show-overflow-tooltip />
-          <el-table-column prop="AssetType" label="类型" width="88" />
-          <el-table-column label="操作" width="168" fixed="right">
-            <template #default="{ row }">
-              <el-button link type="primary" size="small" @click="getAssetDetail(row)">详情</el-button>
-              <el-button link type="primary" size="small" @click="openEditAsset(row)">编辑</el-button>
-              <el-button link type="danger" size="small" @click="deleteAsset(row)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-col>
-    </el-row>
+      </div>
+      <el-table :data="assetRows" size="small" stripe max-height="320">
+        <el-table-column prop="Id" label="Id" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="Name" label="名称" min-width="90" show-overflow-tooltip />
+        <el-table-column prop="AssetType" label="类型" width="88" />
+        <el-table-column label="操作" width="168" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="getAssetDetail(row)">详情</el-button>
+            <el-button link type="primary" size="small" @click="openEditAsset(row)">编辑</el-button>
+            <el-button link type="danger" size="small" @click="deleteAsset(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
 
-    <div class="panel-title" style="margin-top: 16px">最近一次响应（调试）</div>
-    <el-input v-model="lastRawJson" type="textarea" :rows="6" readonly class="mono" />
+    <div class="sd2-section">
+      <div class="sd2-section-head">
+        <span class="sd2-section-title">最近一次响应（调试）</span>
+      </div>
+      <el-input v-model="lastRawJson" type="textarea" :rows="6" readonly class="mono" />
+    </div>
 
     <!-- 新建资产组 -->
     <el-dialog v-model="dlgGroupCreate" title="CreateAssetGroup" width="480px" destroy-on-close>
@@ -791,43 +798,48 @@ async function deleteAsset(row) {
 </script>
 
 <style scoped>
-.sd2-asset-mgmt {
-  max-width: 1100px;
-}
 .sd2-intro {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 .sd2-intro code {
   font-size: 12px;
 }
 .sd2-form {
-  margin-bottom: 8px;
+  margin-bottom: 0;
   max-width: 720px;
+}
+.sd2-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--cgp-border);
+}
+.sd2-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.sd2-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cgp-text);
+}
+.sd2-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }
 .field-hint {
   margin: 6px 0 0;
   font-size: 12px;
-  color: #909399;
+  color: var(--cgp-text-subtle);
   line-height: 1.5;
 }
 .field-hint code {
   font-size: 11px;
-}
-.panel-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-  margin-bottom: 8px;
-}
-.panel-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 8px;
-  align-items: center;
-}
-.panel-actions.row-gap {
-  flex-wrap: nowrap;
 }
 .mono :deep(textarea) {
   font-family: Menlo, Consolas, monospace;
@@ -841,7 +853,7 @@ async function deleteAsset(row) {
 }
 .sd2-saved-hint {
   font-size: 12px;
-  color: #67c23a;
+  color: var(--cgp-accent);
   line-height: 1.5;
 }
 </style>

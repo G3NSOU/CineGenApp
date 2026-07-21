@@ -1,6 +1,6 @@
 app:
   name: CineGen API
-  version: 1.4.25
+  version: 2.0.1
   debug: false
   language: zh
 server:
@@ -13,7 +13,7 @@ server:
   insecure_tls: false
 database:
   type: sqlite
-  path: ./data/drama_generator.db
+  path: /Users/gensou/Library/Application Support/CineGen/backend/data/drama_generator.db
   max_idle: 10
   max_open: 100
 storage:

@@ -6,8 +6,8 @@
           <el-icon><ArrowLeft /></el-icon>返回
         </el-button>
         <span class="breadcrumb-sep">›</span>
-        <span class="page-title">AI 配置</span>
-        <nav class="ai-config-header-tabs" aria-label="AI 配置分类">
+        <span class="page-title">设置</span>
+        <nav class="ai-config-header-tabs" aria-label="设置分类">
           <button
             v-for="item in configTabs"
             :key="item.value"
@@ -43,6 +43,7 @@ const configTabs = [
   { value: 'generation', label: '生成设置' },
   { value: 'storage', label: '存储' },
   { value: 'sd2_assets', label: 'SD2 资产' },
+  { value: 'version', label: '版本' },
 ]
 
 function returnPath() {

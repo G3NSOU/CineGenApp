@@ -1,6 +1,6 @@
 {
   "name": "cinegen-backend",
-  "version": "1.4.25",
+  "version": "2.0.1",
   "description": "Node.js backend for CineGen",
   "main": "src/server.js",
   "scripts": {
