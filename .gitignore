@@ -9,6 +9,10 @@ Thumbs.db
 .codex/
 .hermes/
 
+# macOS Finder duplicate files (e.g. "theme 2.css", "ci 2.yml")
+* [0-9].*
+* [0-9][0-9].*
+
 # Environment and secrets
 .env
 .env.*
@@ -62,3 +66,5 @@ windows-patches/
 backend-node/configs/ai-configs-*.json
 参考前端/
 各大平台中转站配置/
+# Local dev-only preview pages (not shipped)
+cinegen-bg-preview.html
