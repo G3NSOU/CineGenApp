@@ -1200,7 +1200,7 @@ onBeforeUnmount(() => {
 .empty-block .el-icon, .stage-placeholder .el-icon { font-size: 34px; }
 .empty-block strong { color: #d4d4d8; }
 .empty-block span { max-width: 180px; font-size: 12px; line-height: 1.6; }
-.studio-workspace { display: grid; grid-template-rows: auto minmax(0, 1fr) auto 176px; background: #09090e; }
+.studio-workspace { display: grid; grid-template-rows: auto minmax(0, 1fr) 48px 176px; background: #09090e; }
 .preview-header { min-height: 66px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(113, 113, 122, .2); }
 .preview-header h2 { margin: 4px 0 0; font-size: 17px; }
 .preview-stage { position: relative; min-height: 0; padding: 24px; display: grid; place-items: center; overflow: hidden; background: radial-gradient(circle at 50% 40%, #181824 0, #0a0a0f 56%); }
