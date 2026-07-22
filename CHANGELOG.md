@@ -8,6 +8,17 @@
 
 ---
 
+## [2.0.2] - 2026-07-22
+
+### Fixed
+- 自由创作预览区布局：`.studio-workspace` 从 grid 改为 flex column，彻底消除按钮下方大片空白
+- 9:16 等竖屏视频溢出：视频严格约束在预览容器内（`max-height:100%` + `object-fit:contain`）
+- 预览操作栏高度收敛到 44px，`min-height` 强制取消，历史条紧贴按钮下方
+
+### Changed
+- 预览区、操作栏、历史条改为 flex 分层布局：`preview-stage` 吸收剩余空间，`preview-actions` 固定 44px，`history-strip` 按内容大小
+- 视频保持居中显示，竖屏视频完整可见不再被拉伸
+
 ## [2.0.1] - 2026-07-22
 
 > CineGen 2.0 里程碑：界面与动态背景系统重制，新增 APIMart 中转 Seedance 2.0 系列支持，并由新引擎接手完成前序遗留的 UI 残局。版本号规则调整为十进制（c 满 10 进 b，a 由大更新提升）。
