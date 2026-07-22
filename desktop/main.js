@@ -399,6 +399,26 @@ async function startBackend() {
   });
 }
 
+
+// ============================================
+// Windows 黑屏修复：强制兼容性渲染路径
+// 解决 Chromium 150 + DirectX/ANGLE 驱动不兼容导致合成层全黑
+// ============================================
+const disableHardwareAccel = process.platform === 'win32';
+if (disableHardwareAccel) {
+  app.disableHardwareAcceleration();
+  writeMainLog('[Windows] 已禁用硬件加速');
+}
+// 额外的 Windows 渲染兼容性 flag（即使不禁用硬件加速也建议加）
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('disable-gpu-compositing');
+  app.commandLine.appendSwitch('disable-features', 'VizDisplayCompositor');
+  app.commandLine.appendSwitch('disable-software-rasterizer', 'false');  // 允许回退到软渲染
+  app.commandLine.appendSwitch('angle-default-device-id', '0');  // 强制选第一个 GPU
+  app.commandLine.appendSwitch('no-sandbox');  // 某些企业环境沙箱会破坏渲染
+  writeMainLog('[Windows] 已应用渲染兼容性 flag');
+}
+
 app.whenReady().then(async () => {
   writeMainLog('app.whenReady');
   let port;

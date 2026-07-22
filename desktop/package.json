@@ -1,6 +1,6 @@
 {
   "name": "cinegen-desktop",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "CineGen desktop application",
   "main": "main.js",
   "author": "CineGen contributors",
