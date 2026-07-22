@@ -1211,12 +1211,14 @@ onBeforeUnmount(() => {
 .preview-status--failed .el-icon, .preview-status--failed strong { color: #f87171; }
 .preview-status--cancelled .el-icon, .preview-status--cancelled strong { color: #b6b6b2; }
 .preview-actions {
+  box-sizing: border-box;
   height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: unset; padding: 8px 16px;
+  min-height: unset;
+  padding: 6px 16px;
   border-top: 1px solid rgba(235,235,235,.075);
   background: rgba(14,15,15,.34);
 }
