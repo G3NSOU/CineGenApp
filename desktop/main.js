@@ -327,8 +327,20 @@ function createWindow(port) {
       writeMainLog('window shown (fallback timeout, check page load)');
     }
   }, 8000);
+  // 启动时诊断：记录前端产物是否就位（便于用户遇到白屏时排查）
+  const indexHtmlPath = path.join(getWebDistPath(), 'index.html');
+  const indexExists = fs.existsSync(indexHtmlPath);
+  writeMainLog(`web dist check: ${indexHtmlPath} exists=${indexExists}`);
+  if (!indexExists && app.isPackaged) {
+    writeMainLog('WARN: frontweb/dist/index.html 缺失，前端窗口很可能白屏。请重新构建 buildkit。');
+  }
   win.webContents.on('did-fail-load', (_e, code, desc, url) => {
     writeMainLog(`did-fail-load code=${code} desc=${desc} url=${url}`);
+    // 主文档加载失败时，弹一个明确的错误页面而不是空白窗口
+    if (typeof url === 'string' && url.startsWith('http://127.0.0.1') && !win.isDestroyed()) {
+      const errHtml = `<!doctype html><meta charset="utf-8"><style>body{background:#0e0e14;color:#e4e4e7;font-family:-apple-system,Segoe UI,system-ui;padding:32px;line-height:1.6}h1{color:#f87171}code{background:#1f1f28;padding:2px 6px;border-radius:4px}</style><h1>CineGen 前端加载失败</h1><p>后端已启动 (端口 ${port}) 但前端资源缺失。</p><ul><li>期望路径：<code>${indexHtmlPath}</code></li><li>该文件存在：<b>${indexExists}</b></li><li>错误码 ${code}: ${desc}</li></ul><p>请检查：<ol><li>Windows BuildKit 中 <code>frontweb-dist</code> 是否被正确复制到安装包 resources/frontweb/dist/</li><li>杀毒软件是否拦截了 resources 目录</li><li>日志：<code>${MAIN_STARTUP_LOG}</code></li></ol>`;
+      win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(errHtml)}`);
+    }
   });
   const rendererUrl = new URL(`http://127.0.0.1:${port}`);
   rendererUrl.searchParams.set('desktop', isMac ? 'mac' : isWindows ? 'windows' : 'electron');

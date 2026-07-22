@@ -50,6 +50,17 @@ function walk(dir) {
     }
   }
 }
+// 强制校验：前端产物必须包含 index.html，否则 Electron 窗口会白屏
+const indexHtml = path.join(compiledRoot, 'index.html');
+if (!fs.existsSync(indexHtml)) {
+  throw new Error(`Frontend index.html missing at: ${indexHtml}\n请确认 copy-front 已执行且 extraResources 生效`);
+}
+const indexSize = fs.statSync(indexHtml).size;
+if (indexSize < 200) {
+  throw new Error(`Frontend index.html suspiciously small (${indexSize} bytes) at: ${indexHtml}`);
+}
+console.log(`Frontend check passed: ${indexHtml} (${indexSize} bytes)`);
+
 walk(compiledRoot);
 
 for (const name of targetPlatform === 'win32' ? ['ffmpeg.exe', 'ffprobe.exe'] : ['ffmpeg', 'ffprobe']) {

@@ -8,6 +8,20 @@
 
 ---
 
+## [2.0.3] - 2026-07-22
+
+### Fixed
+- Windows 桌面端白屏问题诊断增强：
+  - `main.js` 启动时校验 `frontweb/dist/index.html` 是否存在，日志写明结果
+  - 加载失败时显示明确的错误页（含路径、错误码、日志位置），不再空白窗口
+- `audit-packaged-app.js` 打包审计新增强制校验：
+  - Windows/macOS 打包必须包含 `resources/frontweb/dist/index.html`
+  - 文件小于 200 字节视为异常，直接终止打包避免发行"废包"
+
+### Notes
+- macOS DMG 和 Windows exe 使用相同的 `?desktop=<platform>` query 后缀，仅用于前端识别宿主环境（在 `frontweb/src/main.js` 里被读取加 `data-desktop-shell` 属性），**不是**导致白屏的原因
+- Windows BuildKit 现在会在 electron-builder 之后运行 `audit-packaged-app.js --platform=win32`，前端产物缺失时构建立即失败
+
 ## [2.0.2] - 2026-07-22
 
 ### Fixed
