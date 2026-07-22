@@ -1204,19 +1204,19 @@ onBeforeUnmount(() => {
 .preview-header { min-height: 66px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(113, 113, 122, .2); }
 .preview-header h2 { margin: 4px 0 0; font-size: 17px; }
 .preview-stage { position: relative; min-height: 0; padding: 24px; display: grid; place-items: center; overflow: hidden; background: radial-gradient(circle at 50% 40%, #181824 0, #0a0a0f 56%); }
-.preview-stage > video { width: 100%; height: 100%; max-width: 1100px; object-fit: contain; border-radius: 10px; background: #000; }
+.preview-stage > video { width: 100%; height: 100%; max-width: 1100px; max-height: 100%; object-fit: contain; border-radius: 10px; background: #000; }
 .preview-status { display: flex; flex-direction: column; align-items: center; gap: 9px; color: #a1a1aa; text-align: center; }
 .preview-status .el-icon { font-size: 44px; color: #6366f1; }
 .preview-status strong { color: #e4e4e7; font-size: 18px; }
 .preview-status--failed .el-icon, .preview-status--failed strong { color: #f87171; }
 .preview-status--cancelled .el-icon, .preview-status--cancelled strong { color: #b6b6b2; }
 .preview-actions {
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 54px;
-  padding: 8px 16px;
+  min-height: unset; padding: 8px 16px;
   border-top: 1px solid rgba(235,235,235,.075);
   background: rgba(14,15,15,.34);
 }
