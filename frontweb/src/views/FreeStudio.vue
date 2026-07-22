@@ -1221,7 +1221,10 @@ onBeforeUnmount(() => {
   padding: 6px 16px;
   border-top: 1px solid rgba(235,235,235,.075);
   background: rgba(14,15,15,.34);
+  position: relative;
+  margin: 0 !important;
 }
+
 .preview-actions-enter-active,
 .preview-actions-leave-active { transition: opacity 220ms ease, transform 240ms cubic-bezier(.2,.8,.2,1); }
 .preview-actions-enter-from,
