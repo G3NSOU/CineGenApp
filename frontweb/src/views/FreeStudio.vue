@@ -1212,7 +1212,7 @@ onBeforeUnmount(() => {
 .preview-status--cancelled .el-icon, .preview-status--cancelled strong { color: #b6b6b2; }
 .preview-actions {
   box-sizing: border-box;
-  height: 48px;
+  height: 48px !important;
   display: flex;
   align-items: center;
   justify-content: center;
