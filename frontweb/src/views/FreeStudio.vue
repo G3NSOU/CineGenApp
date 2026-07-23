@@ -1204,7 +1204,7 @@ onBeforeUnmount(() => {
 .preview-header { flex: 0 0 auto; min-height: 66px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(113, 113, 122, .2); }
 .preview-header h2 { margin: 4px 0 0; font-size: 17px; }
 .preview-stage { flex: 1 1 0; min-height: 0; position: relative; padding: 12px 24px; display: grid; place-items: center; overflow: hidden; background: radial-gradient(circle at 50% 40%, #181824 0, #0a0a0f 56%); }
-.preview-stage > video { width: 100%; height: 100%; max-width: 1100px; max-height: 100%; object-fit: contain; border-radius: 10px; background: #000; }
+.preview-stage > video { position: absolute; inset: 12px 24px; max-width: calc(100% - 48px); max-height: calc(100% - 24px); object-fit: contain; border-radius: 10px; background: #000; margin: auto; }
 .preview-status { display: flex; flex-direction: column; align-items: center; gap: 9px; color: #a1a1aa; text-align: center; }
 .preview-status .el-icon { font-size: 44px; color: #6366f1; }
 .preview-status strong { color: #e4e4e7; font-size: 18px; }
